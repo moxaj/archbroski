@@ -1,4 +1,5 @@
-import { CircularProgress, Fade } from '@mui/material';
+import { Check, Error, Help } from '@mui/icons-material';
+import { CircularProgress, Fade, Grow } from '@mui/material';
 import { Box } from '@mui/system';
 import { invoke, tauri, window } from '@tauri-apps/api';
 import { UnlistenFn } from '@tauri-apps/api/event';
@@ -19,6 +20,10 @@ type State = {
     type: 'Computed';
     stash_area: Rectangle;
     suggested_cell_area: Rectangle;
+} | {
+    type: 'DetectionError';
+} | {
+    type: 'LogicError';
 }
 
 const Overlay = () => {
@@ -76,31 +81,32 @@ const Overlay = () => {
                 setTimeout(async () => {
                     await invoke('hide_overlay_window');
                 }, 50);
-            } else {
-                let currentWindow = window.getCurrent();
-                let [monitorWidth, monitorHeight] = await tauri.invoke<[number, number]>('get_monitor_size');
-                currentWindow.setSize(new window.PhysicalSize(monitorWidth, monitorHeight));
-
-                const canvas = canvasRef.current!;
-                canvas.width = monitorWidth;
-                canvas.height = monitorHeight;
-                canvas.style.width = `${monitorWidth}px`;
-                canvas.style.height = `${monitorHeight}px`;
-
-                const ctx = canvas.getContext('2d')!;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                if (state.type === 'Computed') {
-                    const { stash_area, suggested_cell_area } = state;
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-                    ctx.fillRect(stash_area.x, stash_area.y, stash_area.width, stash_area.height);
-                    ctx.clearRect(suggested_cell_area.x, suggested_cell_area.y, suggested_cell_area.width, suggested_cell_area.height);
-                }
-
-                setTimeout(async () => {
-                    await currentWindow.show();
-                    await currentWindow.setFocus();
-                }, 50);
+                return;
             }
+
+            let currentWindow = window.getCurrent();
+            let [monitorWidth, monitorHeight] = await tauri.invoke<[number, number]>('get_monitor_size');
+            currentWindow.setSize(new window.PhysicalSize(monitorWidth, monitorHeight));
+
+            const canvas = canvasRef.current!;
+            canvas.width = monitorWidth;
+            canvas.height = monitorHeight;
+            canvas.style.width = `${monitorWidth}px`;
+            canvas.style.height = `${monitorHeight}px`;
+
+            const ctx = canvas.getContext('2d')!;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (state.type === 'Computed') {
+                const { stash_area, suggested_cell_area } = state;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                ctx.fillRect(stash_area.x, stash_area.y, stash_area.width, stash_area.height);
+                ctx.clearRect(suggested_cell_area.x, suggested_cell_area.y, suggested_cell_area.width, suggested_cell_area.height);
+            }
+
+            setTimeout(async () => {
+                await currentWindow.show();
+                await currentWindow.setFocus();
+            }, 50);
         })();
     }, [state]);
     return (
@@ -109,9 +115,9 @@ const Overlay = () => {
                 position: 'fixed',
                 left: '50%',
                 bottom: 100,
-                transform: 'translateX(-50%)'
+                transform: 'translate(-50%, -50%)'
             }}>
-                <Fade in={state.type === 'Computing'} timeout={1000}>
+                <Fade in={state.type === 'Computing'} timeout={1500} style={{ zIndex: 1 }}>
                     {
                         <Box sx={{
                             p: 0.5,
@@ -125,6 +131,69 @@ const Overlay = () => {
                         </Box>
                     }
                 </Fade>
+            </Box>
+            <Box sx={{
+                position: 'fixed',
+                left: '50%',
+                bottom: 100,
+                transform: 'translate(-50%, -50%)'
+            }}>
+                <Grow in={state.type === 'Computed'} timeout={500} style={{ zIndex: 2 }}>
+                    {
+                        <Box sx={{
+                            p: 0.5,
+                            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                        }}>
+                            <Check style={{ color: 'green', fontSize: '40px' }} />
+                        </Box>
+                    }
+                </Grow>
+            </Box>
+            <Box sx={{
+                position: 'fixed',
+                left: '50%',
+                bottom: 100,
+                transform: 'translate(-50%, -50%)'
+            }}>
+                <Grow in={state.type === 'DetectionError'} timeout={500} style={{ zIndex: 2 }}>
+                    {
+                        <Box sx={{
+                            p: 0.5,
+                            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                        }}>
+                            <Error style={{ color: 'red', fontSize: '40px' }} />
+                        </Box>
+                    }
+                </Grow>
+            </Box>
+            <Box sx={{
+                position: 'fixed',
+                left: '50%',
+                bottom: 100,
+                transform: 'translate(-50%, -50%)'
+            }}>
+                <Grow in={state.type === 'LogicError'} timeout={500} style={{ zIndex: 2 }}>
+                    {
+                        <Box sx={{
+                            p: 0.5,
+                            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                        }}>
+                            <Help style={{ color: 'red', fontSize: '40px' }} />
+                        </Box>
+                    }
+                </Grow>
             </Box>
             <canvas ref={canvasRef} />
         </div >

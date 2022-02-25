@@ -2,8 +2,6 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
-#![allow(dead_code)]
-#![allow(unused_variables)]
 
 mod image;
 mod logic;
@@ -25,6 +23,7 @@ use tauri::{
     generate_context, AppHandle, Builder, CustomMenuItem, GlobalShortcutManager, Icon, Manager,
     SystemTray, SystemTrayEvent, SystemTrayMenu, Window, WindowBuilder, WindowUrl,
 };
+use thiserror::Error;
 
 use crate::image::process_image;
 use crate::logic::suggest_modifier_id;
@@ -50,6 +49,8 @@ enum InnerState {
     Hidden,
     Computing,
     Computed(Highlight),
+    DetectionError,
+    LogicError,
 }
 
 #[derive(Clone, Copy, Debug, Serialize)]
@@ -72,6 +73,14 @@ impl Screenshot {
         cvt_color(&mat1, &mut mat2, COLOR_BGRA2BGR, 0).unwrap();
         Ok(mat2)
     }
+}
+
+#[derive(Error, Debug)]
+pub enum ActivationError {
+    #[error("failed to parse the taken screenshot")]
+    DetectionError,
+    #[error("failed to suggest a modifier")]
+    LogicError,
 }
 
 fn create_settings_window(app: &AppHandle) {
@@ -183,8 +192,8 @@ fn activate(app: &AppHandle) {
     std::thread::spawn(move || {
         update_overlay(&app_, InnerState::Computing);
         if let Err(error) = Display::primary()
-            .map_err(|error| Box::new(error) as Box<dyn Error>)
-            .and_then(|display| Capturer::new(display).map_err(Into::into))
+            .map_err(|_| ActivationError::DetectionError)
+            .and_then(|display| Capturer::new(display).map_err(|_| ActivationError::DetectionError))
             .and_then(|mut capturer| {
                 retry(Fixed::from_millis(20).take(10), || {
                     let capturer_width = capturer.width();
@@ -193,7 +202,7 @@ fn activate(app: &AppHandle) {
                         .frame()
                         .map(|frame| (frame.to_vec(), capturer_width, capturer_height))
                 })
-                .map_err(Into::into)
+                .map_err(|_| ActivationError::DetectionError)
             })
             .and_then(|(buffer, width, height)| {
                 let cache_state = app_.state::<Result<Mutex<Cache>, &'static str>>();
@@ -206,10 +215,10 @@ fn activate(app: &AppHandle) {
                         Screenshot::new(buffer, (width, height)).into_mat().unwrap(),
                     )
                 )
-                .ok_or_else(|| "failed to process the image".into())
+                .ok_or_else(|| ActivationError::DetectionError)
                 .and_then(|process_image_result| {
                     if process_image_result.cache_modified {
-                        cache.save()?;
+                        cache.save().map_err(|_| ActivationError::DetectionError)?;
                     }
 
                     Ok(process_image_result)
@@ -257,7 +266,7 @@ fn activate(app: &AppHandle) {
                                 .collect_vec()
                         )
                     )
-                    .ok_or_else(|| "failed to suggest a modifier id".into())
+                    .ok_or_else(|| ActivationError::LogicError)
                     .map(|suggested_modifier_id| {
                         let suggested_cell_area = *stash_by_modifier_ids[&suggested_modifier_id]
                             .iter()
@@ -276,8 +285,13 @@ fn activate(app: &AppHandle) {
                 },
             )
         {
-            println!("{:?}", error);
-            update_overlay(&app_, InnerState::Hidden);
+            update_overlay(
+                &app_,
+                match error {
+                    ActivationError::DetectionError => InnerState::DetectionError,
+                    ActivationError::LogicError => InnerState::LogicError,
+                },
+            );
         }
     });
 }

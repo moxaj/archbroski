@@ -1,6 +1,5 @@
 use crate::collection;
 use crate::logic::{ModifierId, MODIFIERS};
-use crate::utils::save_image;
 use bincode::{deserialize_from, serialize_into};
 use dashmap::DashMap;
 use dirs::config_dir;
@@ -296,7 +295,7 @@ impl SerializableCache {
     }
 
     fn load_or_new_saved() -> Result<Self, Box<dyn Error>> {
-        Self::load().or_else(|error| Self::new_saved())
+        Self::load().or_else(|_| Self::new_saved())
     }
 }
 
@@ -476,7 +475,7 @@ fn get_layout(cache: &mut Cache, screenshot: &Mat) -> Option<HashMap<u8, Vec2>> 
                 .filter_map(|(&tag, cell_group)| {
                     let cell_group = cell_group.lock().unwrap();
                     let (offset, score) = match_template(screenshot, &cell_group.template);
-                    if score > 0.95 {
+                    if score.is_normal() && score > 0.95 {
                         Some((tag, offset))
                     } else {
                         None
@@ -556,7 +555,7 @@ fn get_modifier_id(
                 })
                 .max_by(|&(_, score1), &(_, score2)| score1.partial_cmp(&score2).unwrap_or(Equal))
                 .unwrap();
-            if score > 0.8 {
+            if score.is_normal() && score > 0.8 {
                 Some(modifier_id)
             } else {
                 None

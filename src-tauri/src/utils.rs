@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use opencv::core::{Mat, Vector};
 use opencv::imgcodecs::imwrite;
 
