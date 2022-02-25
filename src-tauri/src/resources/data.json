@@ -1,0 +1,773 @@
+[
+  {
+    "id": 0,
+    "name": "Toxic",
+    "recipe": [],
+    "rewards": {
+      "Gem": 1,
+      "Generic": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 1,
+    "name": "Chaosweaver",
+    "recipe": [],
+    "rewards": {
+      "Gem": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 2,
+    "name": "Frostweaver",
+    "recipe": [],
+    "rewards": {
+      "Armour": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 3,
+    "name": "Permafrost",
+    "recipe": [],
+    "rewards": {
+      "Generic": 1,
+      "Armour": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 4,
+    "name": "Hasted",
+    "recipe": [],
+    "rewards": {
+      "Generic": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 5,
+    "name": "Deadeye",
+    "recipe": [],
+    "rewards": {
+      "Jewelry": 1,
+      "Armour": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 6,
+    "name": "Bombardier",
+    "recipe": [],
+    "rewards": {
+      "Armour": 1,
+      "Weapon": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 7,
+    "name": "Flameweaver",
+    "recipe": [],
+    "rewards": {
+      "Weapon": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 8,
+    "name": "Incendiary",
+    "recipe": [],
+    "rewards": {
+      "Generic": 1,
+      "Weapon": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 9,
+    "name": "Arcane Buffer",
+    "recipe": [],
+    "rewards": {
+      "Essence": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 10,
+    "name": "Echoist",
+    "recipe": [],
+    "rewards": {
+      "Generic": 1,
+      "Currency": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 11,
+    "name": "Stormweaver",
+    "recipe": [],
+    "rewards": {
+      "Jewelry": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 12,
+    "name": "Dynamo",
+    "recipe": [],
+    "rewards": {
+      "Generic": 1,
+      "Jewelry": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 13,
+    "name": "Bonebreaker",
+    "recipe": [],
+    "rewards": {
+      "Generic": 1,
+      "Weapon": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 14,
+    "name": "Bloodletter",
+    "recipe": [],
+    "rewards": {
+      "Weapon": 1,
+      "Jewelry": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 15,
+    "name": "Steel-Infused",
+    "recipe": [],
+    "rewards": {
+      "Weapon": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 16,
+    "name": "Gargantuan",
+    "recipe": [],
+    "rewards": {
+      "Currency": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 17,
+    "name": "Berserker",
+    "recipe": [],
+    "rewards": {
+      "Unique": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 18,
+    "name": "Sentinel",
+    "recipe": [],
+    "rewards": {
+      "Armour": 2
+    },
+    "effect": null
+  },
+  {
+    "id": 19,
+    "name": "Juggernaut",
+    "recipe": [],
+    "rewards": {
+      "Harbinger": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 20,
+    "name": "Vampiric",
+    "recipe": [],
+    "rewards": {
+      "Delve": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 21,
+    "name": "Overcharged",
+    "recipe": [],
+    "rewards": {
+      "Jewelry": 2
+    },
+    "effect": null
+  },
+  {
+    "id": 22,
+    "name": "Soul Conduit",
+    "recipe": [],
+    "rewards": {
+      "Map": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 23,
+    "name": "Opulent",
+    "recipe": [],
+    "rewards": {},
+    "effect": null
+  },
+  {
+    "id": 24,
+    "name": "Malediction",
+    "recipe": [],
+    "rewards": {
+      "DivinationCard": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 25,
+    "name": "Consecrator",
+    "recipe": [],
+    "rewards": {
+      "Fragment": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 26,
+    "name": "Frenzied",
+    "recipe": [],
+    "rewards": {
+      "Unique": 1,
+      "Generic": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 27,
+    "name": "Heralding Minions",
+    "recipe": [
+      9,
+      12
+    ],
+    "rewards": {
+      "Fragment": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 28,
+    "name": "Empowering Minions",
+    "recipe": [
+      16,
+      31,
+      33
+    ],
+    "rewards": {
+      "Blight": 1,
+      "Ritual": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 29,
+    "name": "Assassin",
+    "recipe": [
+      5,
+      20
+    ],
+    "rewards": {
+      "Currency": 2
+    },
+    "effect": null
+  },
+  {
+    "id": 30,
+    "name": "Trickster",
+    "recipe": [
+      10,
+      21,
+      29
+    ],
+    "rewards": {
+      "DivinationCard": 1,
+      "Currency": 1,
+      "Unique": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 31,
+    "name": "Necromancer",
+    "recipe": [
+      6,
+      21
+    ],
+    "rewards": {
+      "Generic": 1
+    },
+    "effect": {
+      "Reroll": {
+        "count": 2
+      }
+    }
+  },
+  {
+    "id": 32,
+    "name": "Rejuvenating",
+    "recipe": [
+      16,
+      20
+    ],
+    "rewards": {
+      "Currency": 1
+    },
+    "effect": {
+      "Reroll": {
+        "count": 1
+      }
+    }
+  },
+  {
+    "id": 33,
+    "name": "Executioner",
+    "recipe": [
+      17,
+      26
+    ],
+    "rewards": {
+      "Legion": 1,
+      "Breach": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 34,
+    "name": "Hexer",
+    "recipe": [
+      1,
+      10
+    ],
+    "rewards": {
+      "Essence": 2
+    },
+    "effect": null
+  },
+  {
+    "id": 35,
+    "name": "Drought Bringer",
+    "recipe": [
+      5,
+      24
+    ],
+    "rewards": {
+      "Labyrinth": 2
+    },
+    "effect": null
+  },
+  {
+    "id": 36,
+    "name": "Entangler",
+    "recipe": [
+      0,
+      14
+    ],
+    "rewards": {
+      "Delve": 2
+    },
+    "effect": null
+  },
+  {
+    "id": 37,
+    "name": "Temporal Bubble",
+    "recipe": [
+      9,
+      14,
+      34
+    ],
+    "rewards": {
+      "Heist": 1,
+      "Expedition": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 38,
+    "name": "Treant Horde",
+    "recipe": [
+      0,
+      15,
+      18
+    ],
+    "rewards": {
+      "Treant": 8
+    },
+    "effect": null
+  },
+  {
+    "id": 39,
+    "name": "Frost Strider",
+    "recipe": [
+      2,
+      4
+    ],
+    "rewards": {
+      "Armour": 3
+    },
+    "effect": null
+  },
+  {
+    "id": 40,
+    "name": "Ice Prison",
+    "recipe": [
+      3,
+      18
+    ],
+    "rewards": {
+      "Armour": 2
+    },
+    "effect": {
+      "Reroll": {
+        "count": 1
+      }
+    }
+  },
+  {
+    "id": 41,
+    "name": "Soul Eater",
+    "recipe": [
+      16,
+      22,
+      31
+    ],
+    "rewards": {
+      "Map": 2
+    },
+    "effect": null
+  },
+  {
+    "id": 42,
+    "name": "Flame Strider",
+    "recipe": [
+      4,
+      7
+    ],
+    "rewards": {
+      "Weapon": 3
+    },
+    "effect": null
+  },
+  {
+    "id": 43,
+    "name": "Corpse Detonator",
+    "recipe": [
+      8,
+      31
+    ],
+    "rewards": {
+      "DivinationCard": 2
+    },
+    "effect": null
+  },
+  {
+    "id": 44,
+    "name": "Evocationist",
+    "recipe": [
+      2,
+      7,
+      11
+    ],
+    "rewards": {
+      "Generic": 1,
+      "Jewelry": 1,
+      "Armour": 1,
+      "Weapon": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 45,
+    "name": "Magma Barrier",
+    "recipe": [
+      8,
+      13
+    ],
+    "rewards": {
+      "Weapon": 2
+    },
+    "effect": {
+      "Reroll": {
+        "count": 1
+      }
+    }
+  },
+  {
+    "id": 46,
+    "name": "Mirror Image",
+    "recipe": [
+      10,
+      22
+    ],
+    "rewards": {
+      "Scarab": 1
+    },
+    "effect": {
+      "Reroll": {
+        "count": 2
+      }
+    }
+  },
+  {
+    "id": 47,
+    "name": "Storm Strider",
+    "recipe": [
+      4,
+      11
+    ],
+    "rewards": {
+      "Jewelry": 3
+    },
+    "effect": null
+  },
+  {
+    "id": 48,
+    "name": "Mana Siphoner",
+    "recipe": [
+      12,
+      25
+    ],
+    "rewards": {
+      "Jewelry": 2
+    },
+    "effect": {
+      "Reroll": {
+        "count": 1
+      }
+    }
+  },
+  {
+    "id": 49,
+    "name": "Corrupter",
+    "recipe": [
+      1,
+      14
+    ],
+    "rewards": {
+      "Abyss": 2
+    },
+    "effect": null
+  },
+  {
+    "id": 50,
+    "name": "Invulnerable",
+    "recipe": [
+      18,
+      19,
+      25
+    ],
+    "rewards": {
+      "Metamorph": 1,
+      "Delirium": 1
+    },
+    "effect": null
+  },
+  {
+    "id": 51,
+    "name": "Crystal-Skinned",
+    "recipe": [
+      3,
+      17,
+      32
+    ],
+    "rewards": {
+      "Harbinger": 2
+    },
+    "effect": null
+  },
+  {
+    "id": 52,
+    "name": "Empowered Elements",
+    "recipe": [
+      1,
+      15,
+      44
+    ],
+    "rewards": {
+      "Unique": 2
+    },
+    "effect": {
+      "Reroll": {
+        "count": 1
+      }
+    }
+  },
+  {
+    "id": 53,
+    "name": "Effigy",
+    "recipe": [
+      24,
+      34,
+      49
+    ],
+    "rewards": {
+      "DivinationCard": 2
+    },
+    "effect": {
+      "Reroll": {
+        "count": 1
+      }
+    }
+  },
+  {
+    "id": 54,
+    "name": "Lunaris-Touched",
+    "recipe": [
+      28,
+      39,
+      50
+    ],
+    "rewards": {
+      "Unique": 1
+    },
+    "effect": "AdditionalReward"
+  },
+  {
+    "id": 55,
+    "name": "Solaris-Touched",
+    "recipe": [
+      28,
+      45,
+      50
+    ],
+    "rewards": {
+      "Scarab": 1
+    },
+    "effect": "AdditionalReward"
+  },
+  {
+    "id": 56,
+    "name": "Arakaali-Touched",
+    "recipe": [
+      29,
+      36,
+      43
+    ],
+    "rewards": {
+      "DivinationCard": 1
+    },
+    "effect": {
+      "Convert": {
+        "to": "DivinationCard"
+      }
+    }
+  },
+  {
+    "id": 57,
+    "name": "Brine King-Touched",
+    "recipe": [
+      27,
+      40,
+      47
+    ],
+    "rewards": {
+      "Armour": 3
+    },
+    "effect": {
+      "Reroll": {
+        "count": 6
+      }
+    }
+  },
+  {
+    "id": 58,
+    "name": "Tukohama-Touched",
+    "recipe": [
+      13,
+      33,
+      45
+    ],
+    "rewards": {
+      "Weapon": 2,
+      "Fragment": 1
+    },
+    "effect": {
+      "Reroll": {
+        "count": 4
+      }
+    }
+  },
+  {
+    "id": 59,
+    "name": "Abberath-Touched",
+    "recipe": [
+      26,
+      32,
+      42
+    ],
+    "rewards": {
+      "Fragment": 1,
+      "Jewelry": 2
+    },
+    "effect": {
+      "Reroll": {
+        "count": 4
+      }
+    }
+  },
+  {
+    "id": 60,
+    "name": "Shakari-Touched",
+    "recipe": [
+      35,
+      36,
+      41
+    ],
+    "rewards": {
+      "Unique": 1
+    },
+    "effect": {
+      "Convert": {
+        "to": "Unique"
+      }
+    }
+  },
+  {
+    "id": 61,
+    "name": "Innocence-Touched",
+    "recipe": [
+      46,
+      48,
+      54,
+      55
+    ],
+    "rewards": {
+      "Currency": 3
+    },
+    "effect": {
+      "Convert": {
+        "to": "Currency"
+      }
+    }
+  },
+  {
+    "id": 62,
+    "name": "Kitava-Touched",
+    "recipe": [
+      43,
+      49,
+      58,
+      59
+    ],
+    "rewards": {
+      "Generic": 1
+    },
+    "effect": "DoubledReward"
+  }
+]
