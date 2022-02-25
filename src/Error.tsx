@@ -6,13 +6,13 @@ import { SentimentVeryDissatisfied } from "@mui/icons-material";
 const Error = () => {
     const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
     useEffect(() => {
-        window.getCurrent().show();
-    }, []);
-    useEffect(() => {
         (async () => {
             setErrorMessage(await tauri.invoke<string>('get_error_message'));
         })();
     }, []);
+    useEffect(() => {
+        window.getCurrent().show();
+    }, [errorMessage]);
     return (
         <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
             <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>

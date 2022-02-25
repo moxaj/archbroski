@@ -141,6 +141,7 @@ pub type Hotkey = String;
 
 /// All settings for the user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserSettings {
     pub combos: Vec<Vec<ModifierId>>,
     pub forbidden_modifier_ids: HashSet<ModifierId>,

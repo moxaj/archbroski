@@ -10,7 +10,7 @@ type Rectangle = {
     y: number;
     width: number;
     height: number;
-}
+};
 
 type State = {
     type: 'Hidden';
@@ -18,13 +18,13 @@ type State = {
     type: 'Computing';
 } | {
     type: 'Computed';
-    stash_area: Rectangle;
-    suggested_cell_area: Rectangle;
+    stashArea: Rectangle;
+    suggestedCellArea: Rectangle;
 } | {
     type: 'DetectionError';
 } | {
     type: 'LogicError';
-}
+};
 
 const Overlay = () => {
     const [state, setState] = useState<State>({ type: 'Hidden' });
@@ -45,7 +45,7 @@ const Overlay = () => {
         };
     }, []);
     useEffect(() => {
-        const keydownListener = (event: KeyboardEvent) => {
+        const keydownListener = () => {
             setState({ type: 'Hidden' });
         };
         document.addEventListener('keydown', keydownListener);
@@ -55,7 +55,7 @@ const Overlay = () => {
     }, []);
     useEffect(() => {
         const mousedownListener = () => {
-            // setState({ type: 'Hidden' });
+            setState({ type: 'Hidden' });
         };
         document.addEventListener('mousedown', mousedownListener);
         return () => {
@@ -97,7 +97,7 @@ const Overlay = () => {
             const ctx = canvas.getContext('2d')!;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (state.type === 'Computed') {
-                const { stash_area, suggested_cell_area } = state;
+                const { stashArea: stash_area, suggestedCellArea: suggested_cell_area } = state;
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
                 ctx.fillRect(stash_area.x, stash_area.y, stash_area.width, stash_area.height);
                 ctx.clearRect(suggested_cell_area.x, suggested_cell_area.y, suggested_cell_area.width, suggested_cell_area.height);

@@ -29,6 +29,7 @@ use crate::image::process_image;
 use crate::logic::suggest_modifier_id;
 
 #[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Highlight {
     stash_area: Rectangle,
     suggested_cell_area: Rectangle,

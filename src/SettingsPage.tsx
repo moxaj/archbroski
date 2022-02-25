@@ -1,6 +1,6 @@
-import { Help } from "@mui/icons-material";
-import { Box, Divider, FormControlLabel, FormGroup, Icon, Switch, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
-import { useState } from "react";
+import { Help } from '@mui/icons-material';
+import { Box, Divider, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@mui/material';
+import { useEffect, useState } from 'react';
 
 type RewardType = 'Generic'
     | 'Armour'
@@ -65,6 +65,10 @@ const SettingsPage = () => {
             return { ...rewards, [reward]: Math.min(10, Math.max(1, value)) };
         });
     };
+
+    useEffect(() => {
+
+    }, []);
     return (
         <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
@@ -73,13 +77,13 @@ const SettingsPage = () => {
                 </Box>
                 <ToggleButtonGroup
                     sx={{ mx: 2 }}
-                    color="primary"
+                    color='primary'
                     value={mode}
                     exclusive
                     onChange={(_, mode) => updateMode(mode)}
                 >
-                    <ToggleButton value="simple">Simple</ToggleButton>
-                    <ToggleButton value="smart">Smart</ToggleButton>
+                    <ToggleButton value='simple'>Simple</ToggleButton>
+                    <ToggleButton value='smart'>Smart</ToggleButton>
                 </ToggleButtonGroup>
                 <Tooltip title={'Smart mode is slower, but may suggest more valuable combos.'}>
                     <Help />
@@ -91,7 +95,7 @@ const SettingsPage = () => {
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
                 {Object.keys(rewards).map(reward => (
-                    <TextField key={reward} label={reward} type="number" variant="standard"
+                    <TextField key={reward} label={reward} type='number' variant='standard'
                         InputLabelProps={{
                             shrink: true,
                         }}

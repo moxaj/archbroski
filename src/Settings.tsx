@@ -34,55 +34,51 @@ export type RewardType = 'Generic'
 
 type UserSettings = {
     combos: number[][];
-    reward_type_values: { [key: string]: number };
-    forbidde_modifier_ids: Set<number>;
+    forbiddenModifierIds: Set<number>;
+    calculationMode: 'Simple' | 'Smart';
+    preferences: { [key: string]: number };
 };
 
-type UserSettingsResult = {
-    type: 'loading';
-} | {
-    type: 'failed';
-} | {
-    type: 'successful';
-    userSettings: UserSettings;
+/*
+pub struct UserSettings {
+    pub combos: Vec<Vec<ModifierId>>,
+    pub forbidden_modifier_ids: HashSet<ModifierId>,
+    pub calculation_mode: CalculationMode,
+    pub preferences: HashMap<RewardType, usize>,
+    pub time_budget_ms: u64,
+    pub hotkey: String,
 }
+*/
 
 const Settings = () => {
-    const [state, setState] = useState<UserSettingsResult>({ type: 'loading' });
+    const [userSettings, setUserSettings] = useState<UserSettings | undefined>(undefined);
     const [page, setPage] = useState(0);
-
-    useEffect(() => {
-        window.getCurrent().show();
-    }, []);
-
     useEffect(() => {
         (async () => {
-            try {
-                let [userSettings, _] = await Promise.all([
-                    tauri.invoke('get_user_settings'),
-                    new Promise(resolve => setTimeout(resolve, 500))
-                ]);
-                setState({ type: 'successful', userSettings: userSettings as UserSettings });
-            } catch (e) {
-                setState({ type: 'failed' });
-            }
+            let [userSettings] = await Promise.all([
+                tauri.invoke<UserSettings>('get_user_settings'),
+                new Promise(resolve => setTimeout(resolve, 500))
+            ]);
+            setUserSettings(userSettings);
         })()
     }, []);
-
+    useEffect(() => {
+        window.getCurrent().show();
+    }, [userSettings]);
     return (
         <Box sx={{ width: 1, height: 1, display: 'flex' }}>
-            <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+            <AppBar position='fixed' sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
                 <Toolbar data-tauri-drag-region='true'>
                     <Typography variant='h6' component='div' color='inherit'>
-                        Archbro
+                        Archbroski
                     </Typography>
                     <Box sx={{ flexGrow: 1 }} />
-                    <IconButton size="large" color="inherit" onClick={() => { window.getCurrent().close() }}>
+                    <IconButton size='large' color='inherit' onClick={() => { window.getCurrent().close() }}>
                         <Minimize />
                     </IconButton>
                 </Toolbar>
             </AppBar>
-            {state.type === 'loading' && (
+            {userSettings === undefined && (
                 <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
                     <Toolbar />
                     <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -90,21 +86,10 @@ const Settings = () => {
                     </Box>
                 </Box>
             )}
-            {state.type === 'failed' && (
-                <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
-                    <Toolbar />
-                    <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-                        <SentimentVeryDissatisfied sx={{ width: 100, height: 100, mb: 2 }} />
-                        <Typography variant="h5">
-                            Failed to load your settings!
-                        </Typography>
-                    </Box>
-                </Box>
-            )}
-            {state.type === 'successful' && (
-                <Box sx={{ display: 'flex' }}>
+            {userSettings !== undefined && (
+                <Box sx={{ width: 1, display: 'flex' }}>
                     <Drawer
-                        variant="permanent"
+                        variant='permanent'
                         sx={{
                             width: 170,
                             flexShrink: 0,
@@ -132,9 +117,9 @@ const Settings = () => {
                             </ListItem>
                         </List>
                     </Drawer>
-                    <Box component="main" sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                    <Box component='main' sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
                         <Toolbar />
-                        <Box sx={{ p: 2 }}>
+                        <Box sx={{ flexGrow: 1, p: 2 }}>
                             {page === 0 && <SettingsPage />}
                             {page === 1 && <RecipesPage />}
                             {page === 2 && <AboutPage />}
