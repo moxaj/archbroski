@@ -20,7 +20,9 @@ use scrap::{Capturer, Display};
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap};
 use std::error::Error;
+use std::str::FromStr;
 use std::sync::Mutex;
+use tao::accelerator::Accelerator;
 use tauri::{GlobalShortcutManager, Manager, WindowBuilder};
 use thiserror::Error;
 
@@ -196,7 +198,7 @@ fn activate(app: &tauri::AppHandle) {
     );
     drop(global_computation_id_mutex);
 
-    let app_ = app.clone();
+    let app = app.clone();
     std::thread::spawn(move || {
         if let Err(error) = Display::primary()
             .map_err(|_| ActivationError::DetectionError)
@@ -212,7 +214,7 @@ fn activate(app: &tauri::AppHandle) {
                 .map_err(|_| ActivationError::DetectionError)
             })
             .and_then(|(buffer, width, height)| {
-                let cache_state = app_.state::<Result<Mutex<Cache>, &'static str>>();
+                let cache_state = app.state::<Result<Mutex<Cache>, &'static str>>();
                 let cache_state = cache_state.as_ref();
                 let mut cache = cache_state.unwrap().lock().unwrap();
                 timed!(
@@ -252,7 +254,7 @@ fn activate(app: &tauri::AppHandle) {
                         },
                     );
                     let user_settings_state =
-                        app_.state::<Result<Mutex<UserSettings>, &'static str>>();
+                        app.state::<Result<Mutex<UserSettings>, &'static str>>();
                     let user_settings_state = user_settings_state.as_ref();
                     let user_settings = &mut *user_settings_state.unwrap().lock().unwrap();
                     timed!(
@@ -279,10 +281,10 @@ fn activate(app: &tauri::AppHandle) {
                             .iter()
                             .next()
                             .unwrap();
-                        if let State::Computing { id } = get_state(&app_) {
+                        if let State::Computing { id } = get_state(&app) {
                             if id == current_computation_id {
                                 update_overlay(
-                                    &app_,
+                                    &app,
                                     State::Computed(Highlight::new(
                                         stash_area,
                                         suggested_cell_area,
@@ -294,10 +296,10 @@ fn activate(app: &tauri::AppHandle) {
                 },
             )
         {
-            if let State::Computing { id } = get_state(&app_) {
+            if let State::Computing { id } = get_state(&app) {
                 if id == current_computation_id {
                     update_overlay(
-                        &app_,
+                        &app,
                         match error {
                             ActivationError::DetectionError => State::DetectionError,
                             ActivationError::LogicError => State::LogicError,
@@ -376,6 +378,12 @@ fn exit(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+#[tauri::command(async)]
+fn test(hotkey: String) {
+    println!("raw hotkey: {}", hotkey);
+    if let Ok(accelerator) = Accelerator::from_str(hotkey.as_str()) {}
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -385,6 +393,7 @@ fn main() {
             set_hotkey,
             hide_overlay_window,
             exit,
+            test,
         ])
         .system_tray(
             tauri::SystemTray::new()

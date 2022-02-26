@@ -1,93 +1,145 @@
 import { Help } from '@mui/icons-material';
-import { Box, Divider, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { Box, Button, Divider, Grid, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@mui/material';
+import { styled } from '@mui/system';
+import { useEffect, useState, Dispatch, SetStateAction } from 'react';
+import { CalculationMode, RewardType, UserSettings } from './Settings';
+import { tauri, window } from '@tauri-apps/api';
 
-type RewardType = 'Generic'
-    | 'Armour'
-    | 'Weapon'
-    | 'Jewelry'
-    | 'Gem'
-    | 'Map'
-    | 'DivinationCard'
-    | 'Fragment'
-    | 'Essence'
-    | 'Harbinger'
-    | 'Unique'
-    | 'Delve'
-    | 'Blight'
-    | 'Ritual'
-    | 'Currency'
-    | 'Legion'
-    | 'Breach'
-    | 'Labyrinth'
-    | 'Scarab'
-    | 'Abyss'
-    | 'Heist'
-    | 'Expedition'
-    | 'Delirium'
-    | 'Metamorph';
+type SettingsPageProps = {
+    userSettings: UserSettings;
+    setUserSettings: Dispatch<SetStateAction<UserSettings | undefined>>;
+}
 
-const SettingsPage = () => {
-    const [mode, setMode] = useState('simple');
-    const updateMode = (mode: string) => {
-        if (mode) {
-            setMode(mode);
-        }
+const supportedKeys = [
+    // Function keys
+    'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
+    // Numbers
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+];
+
+const SettingsPage = ({ userSettings, setUserSettings }: SettingsPageProps) => {
+    const setHotkey = (hotkey: string) => {
+        setUserSettings(userSettings => ({
+            ...userSettings!,
+            hotkey
+        }));
     };
-    const [rewards, setRewards] = useState<{ [key: string]: number }>({
-        'Generic': 1,
-        'Armour': 1,
-        'Weapon': 1,
-        'Jewelry': 1,
-        'Gem': 1,
-        'Map': 1,
-        'DivinationCard': 1,
-        'Fragment': 1,
-        'Essence': 1,
-        'Harbinger': 1,
-        'Unique': 1,
-        'Delve': 1,
-        'Blight': 1,
-        'Ritual': 1,
-        'Currency': 1,
-        'Legion': 1,
-        'Breach': 1,
-        'Labyrinth': 1,
-        'Scarab': 1,
-        'Abyss': 1,
-        'Heist': 1,
-        'Expedition': 1,
-        'Delirium': 1,
-        'Metamorph': 1
-    });
-    const updateRewards = (reward: RewardType, value: number) => {
-        setRewards(rewards => {
-            return { ...rewards, [reward]: Math.min(10, Math.max(1, value)) };
-        });
+    const setCalculationMode = (calculationMode: CalculationMode) => {
+        setUserSettings(userSettings => ({
+            ...userSettings!,
+            calculationMode
+        }));
     };
-
+    const setTimeBudgetMs = (timeBudgetMs: number) => {
+        setUserSettings(userSettings => ({
+            ...userSettings!,
+            timeBudgetMs
+        }));
+    };
+    const setPreference = (rewardType: string, value: number) => {
+        setUserSettings(userSettings => ({
+            ...userSettings!,
+            preferences: { ...userSettings!.preferences, [rewardType]: value }
+        }));
+    };
+    const [recordingHotkey, setRecordingHotkey] = useState(false);
     useEffect(() => {
+        const keydownListener = (event: KeyboardEvent) => {
+            if (recordingHotkey) {
+                if (event.key === 'Escape') {
+                    setRecordingHotkey(false);
+                }
+            }
+        };
+        document.addEventListener('keydown', keydownListener);
+        return () => {
+            document.removeEventListener('keydown', keydownListener);
+        };
+    }, [recordingHotkey]);
+    useEffect(() => {
+        const keydownListener = (event: KeyboardEvent) => {
+            event.preventDefault();
+            if (recordingHotkey) {
+                console.log(event);
+                if (event.key === 'Escape') {
+                    setRecordingHotkey(false);
+                } else {
+                    let s = '';
+                    if (event.ctrlKey) {
+                        s += 'ctrl + ';
+                    }
 
-    }, []);
+                    if (event.altKey) {
+                        s += 'alt + ';
+                    }
+
+                    if (event.shiftKey) {
+                        s += 'shift + '
+                    }
+
+                    if (event.code.startsWith('Key')) {
+                        s += event.code.substring(3);
+                    } else if (event.code.startsWith('Digit')) {
+                        s += event.code.substring(5);
+                    }
+
+                    console.log(s);
+                    tauri.invoke('test', { hotkey: s });
+                    setRecordingHotkey(false);
+                    // console.log(`lets record ${event.code} alt=${event.altKey} ctrl=${event.ctrlKey} shift=${event.shiftKey}`);
+                }
+            }
+        };
+        document.addEventListener('keypress', keydownListener);
+        return () => {
+            document.removeEventListener('keypress', keydownListener);
+        };
+    }, [recordingHotkey]);
     return (
-        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
-                <Box sx={{ visibility: 'hidden' }}>
-                    <Help />
+        <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ display: 'flex' }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                    <Typography>
+                        Hotkey
+                    </Typography>
+                    <Button variant='outlined' sx={{ width: 200 }} onClick={() => { setRecordingHotkey(true) }}>
+                        {recordingHotkey
+                            ? 'Press a key...'
+                            : userSettings.hotkey}
+                    </Button>
                 </Box>
+            </Box>
+        </Box>
+
+        /*
+        <Grid container sx={{ flexGrow: 1 }}>
+            <Grid item xs={1}>
+                <Typography>
+                    Hotkey
+                </Typography>
+            </Grid>
+            <Grid item xs={3}>
+                <Button variant='outlined' sx={{ width: 200 }}>{userSettings.hotkey}</Button>
+            </Grid>
+            <Grid item xs={3}>
+                <Typography>
+                    Calculation mode
+                </Typography>
+            </Grid>
+            <Grid item xs={3}>
                 <ToggleButtonGroup
                     sx={{ mx: 2 }}
                     color='primary'
                     value={mode}
                     exclusive
-                    onChange={(_, mode) => updateMode(mode)}
-                >
+                    onChange={(_, mode) => updateMode(mode)}>
                     <ToggleButton value='simple'>Simple</ToggleButton>
                     <ToggleButton value='smart'>Smart</ToggleButton>
                 </ToggleButtonGroup>
-                <Tooltip title={'Smart mode is slower, but may suggest more valuable combos.'}>
-                    <Help />
-                </Tooltip>
+            </Grid>
+
+            <Box sx={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
+
             </Box>
             <Divider sx={{ m: 2 }} />
             <Typography sx={{ textAlign: 'center', mb: 4 }}>
@@ -108,7 +160,8 @@ const SettingsPage = () => {
                         onChange={(event) => { updateRewards(reward as RewardType, +event.target.value) }} />
                 ))}
             </Box>
-        </Box>
+        </Grid>
+        */
     )
 };
 

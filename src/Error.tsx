@@ -1,10 +1,19 @@
-import { useEffect, useState } from "react";
-import { AppBar, Box, Button, Toolbar, Typography } from "@mui/material"
-import { tauri, window } from "@tauri-apps/api";
-import { SentimentVeryDissatisfied } from "@mui/icons-material";
+import { useEffect, useState } from 'react';
+import { AppBar, Box, Button, Toolbar, Typography } from '@mui/material'
+import { tauri, window } from '@tauri-apps/api';
+import { SentimentVeryDissatisfied } from '@mui/icons-material';
 
 const Error = () => {
     const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
+    useEffect(() => {
+        const keydownListener = (event: KeyboardEvent) => {
+            event.preventDefault();
+        };
+        document.addEventListener('keydown', keydownListener);
+        return () => {
+            document.removeEventListener('keydown', keydownListener);
+        };
+    }, []);
     useEffect(() => {
         (async () => {
             setErrorMessage(await tauri.invoke<string>('get_error_message'));
@@ -15,7 +24,7 @@ const Error = () => {
     }, [errorMessage]);
     return (
         <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
-            <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+            <AppBar position='fixed' sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
                 <Toolbar data-tauri-drag-region='true'>
                     <Typography variant='h6' component='div' color='inherit'>
                         ArchBro error
@@ -35,7 +44,7 @@ const Error = () => {
                 </Typography>
             </Box>
             <Toolbar sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-                <Button variant="contained" onClick={() => { tauri.invoke('exit') }}>
+                <Button variant='contained' onClick={() => { tauri.invoke('exit') }}>
                     Close
                 </Button>
             </Toolbar>

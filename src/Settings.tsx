@@ -1,11 +1,12 @@
-import { AppBar, Box, Drawer, IconButton, List, ListItem, Toolbar, Typography, ListItemIcon, ListItemText, CircularProgress } from '@mui/material';
-import { Settings as SettingsIcon, Copyright, MenuBook, Minimize, SentimentVeryDissatisfied } from '@mui/icons-material';
+import { AppBar, Box, IconButton, Toolbar, Typography, CircularProgress, Tab, Tabs } from '@mui/material';
+import { Minimize } from '@mui/icons-material';
 import { tauri, window } from '@tauri-apps/api';
 import { useEffect, useState } from 'react';
-import SettingsPage from './SettingsPage';
-import RecipesPage from './RecipesPage';
-import AboutPage from './AboutPage';
 import { Set } from 'typescript';
+import { TabContext, TabPanel } from '@mui/lab';
+import SettingsPage from './SettingsPage';
+import CombosPage from './CombosPage';
+import AboutPage from './AboutPage';
 
 export type RewardType = 'Generic'
     | 'Armour'
@@ -32,28 +33,22 @@ export type RewardType = 'Generic'
     | 'Delirium'
     | 'Metamorph';
 
-type UserSettings = {
+export type CalculationMode = 'Simple' | 'Smart';
+
+export type UserSettings = {
     combos: number[][];
     forbiddenModifierIds: Set<number>;
-    calculationMode: 'Simple' | 'Smart';
+    calculationMode: CalculationMode;
     preferences: { [key: string]: number };
+    timeBudgetMs: number;
+    hotkey: string;
 };
-
-/*
-pub struct UserSettings {
-    pub combos: Vec<Vec<ModifierId>>,
-    pub forbidden_modifier_ids: HashSet<ModifierId>,
-    pub calculation_mode: CalculationMode,
-    pub preferences: HashMap<RewardType, usize>,
-    pub time_budget_ms: u64,
-    pub hotkey: String,
-}
-*/
 
 const Settings = () => {
     const [userSettings, setUserSettings] = useState<UserSettings | undefined>(undefined);
-    const [page, setPage] = useState(0);
+    const [tab, setTab] = useState('settings');
     useEffect(() => {
+        window.getCurrent().show();
         (async () => {
             let [userSettings] = await Promise.all([
                 tauri.invoke<UserSettings>('get_user_settings'),
@@ -62,9 +57,6 @@ const Settings = () => {
             setUserSettings(userSettings);
         })()
     }, []);
-    useEffect(() => {
-        window.getCurrent().show();
-    }, [userSettings]);
     return (
         <Box sx={{ width: 1, height: 1, display: 'flex' }}>
             <AppBar position='fixed' sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
@@ -87,45 +79,32 @@ const Settings = () => {
                 </Box>
             )}
             {userSettings !== undefined && (
-                <Box sx={{ width: 1, display: 'flex' }}>
-                    <Drawer
-                        variant='permanent'
-                        sx={{
-                            width: 170,
-                            flexShrink: 0,
-                            [`& .MuiDrawer-paper`]: { width: 170, boxSizing: 'border-box' },
-                        }}>
+                <TabContext value={tab}>
+                    <Box sx={{ alignSelf: 'stretch', display: 'flex', flexDirection: 'column' }}>
                         <Toolbar />
-                        <List>
-                            <ListItem button key='settings' onClick={() => { setPage(0) }}>
-                                <ListItemIcon>
-                                    <SettingsIcon />
-                                </ListItemIcon>
-                                <ListItemText primary={'Settings'} />
-                            </ListItem>
-                            <ListItem button key='recipes' onClick={() => { setPage(1) }}>
-                                <ListItemIcon>
-                                    <MenuBook />
-                                </ListItemIcon>
-                                <ListItemText primary={'Recipes'} />
-                            </ListItem>
-                            <ListItem button key='about' onClick={() => { setPage(2) }}>
-                                <ListItemIcon>
-                                    <Copyright />
-                                </ListItemIcon>
-                                <ListItemText primary={'About'} />
-                            </ListItem>
-                        </List>
-                    </Drawer>
-                    <Box component='main' sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-                        <Toolbar />
-                        <Box sx={{ flexGrow: 1, p: 2 }}>
-                            {page === 0 && <SettingsPage />}
-                            {page === 1 && <RecipesPage />}
-                            {page === 2 && <AboutPage />}
-                        </Box>
+                        <Tabs
+                            orientation='vertical'
+                            value={tab}
+                            onChange={(_, value) => { setTab(value) }}
+                            sx={{ height: 1, borderRight: 1, borderColor: 'divider' }}>
+                            <Tab label='Settings' value={'settings'} />
+                            <Tab label='Combos' value={'combos'} />
+                            <Tab label='About' value={'about'} />
+                        </Tabs>
                     </Box>
-                </Box>
+                    <Box sx={{ width: 1, display: 'flex', flexDirection: 'column' }}>
+                        <Toolbar />
+                        <TabPanel value={'settings'} >
+                            <SettingsPage userSettings={userSettings} setUserSettings={setUserSettings} />
+                        </TabPanel>
+                        <TabPanel value={'combos'} >
+                            <CombosPage userSettings={userSettings} setUserSettings={setUserSettings} />
+                        </TabPanel>
+                        <TabPanel value={'about'}>
+                            <AboutPage />
+                        </TabPanel>
+                    </Box>
+                </TabContext>
             )}
         </Box>
     );

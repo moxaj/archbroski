@@ -53,6 +53,7 @@ dependencies = [
  "scrap",
  "serde",
  "serde_json",
+ "tao",
  "tauri",
  "tauri-build",
  "thiserror",

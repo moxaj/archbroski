@@ -25,6 +25,7 @@ dirs = "4.0"
 scrap = "0.5"
 opencv = { version = "0.63", features = ["clang-runtime"] }
 serde = { version = "1.0", features = ["derive"] }
+tao = "0.6.2"
 tauri = { version = "1.0.0-rc.3", features = ["api-all", "system-tray"] }
 
 [features]
