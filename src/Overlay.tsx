@@ -30,18 +30,13 @@ const Overlay = () => {
     const [state, setState] = useState<State>({ type: 'Hidden' });
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     useEffect(() => {
-        let unlisten: UnlistenFn;
-        (async () => {
-            unlisten = await window.getCurrent().listen('tauri://blur', () => {
-                setState(state_ => {
-                    return state_.type === 'Hidden' ? state_ : { type: 'Hidden' };
-                });
+        const unlisten = window.getCurrent().listen('tauri://blur', () => {
+            setState(state_ => {
+                return state_.type === 'Hidden' ? state_ : { type: 'Hidden' };
             });
-        })();
+        });
         return () => {
-            if (unlisten) {
-                unlisten();
-            }
+            unlisten.then(f => f());
         };
     }, []);
     useEffect(() => {
@@ -63,16 +58,12 @@ const Overlay = () => {
         };
     }, []);
     useEffect(() => {
-        let unlisten: UnlistenFn;
-        (async () => {
-            unlisten = await window.getCurrent().listen<State>('update', event => {
-                setState(event.payload);
-            });
-        })();
+        const unlisten = window.getCurrent().listen<State>('update', event => {
+            setState(event.payload);
+        });
+
         return () => {
-            if (unlisten) {
-                unlisten();
-            }
+            unlisten.then(f => f());
         };
     }, []);
     useEffect(() => {
@@ -107,7 +98,7 @@ const Overlay = () => {
                 await currentWindow.show();
                 await currentWindow.setFocus();
             }, 50);
-        })();
+        })().catch(console.error);
     }, [state]);
     return (
         <div style={{ width: '100%', height: '100%' }}>

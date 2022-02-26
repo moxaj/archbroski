@@ -5,7 +5,7 @@ import { useEffect, useState, Dispatch, SetStateAction } from 'react';
 import { CalculationMode, RewardType, UserSettings } from './Settings';
 import { tauri, window } from '@tauri-apps/api';
 
-type SettingsPageProps = {
+type GeneralPageProps = {
     userSettings: UserSettings;
     setUserSettings: Dispatch<SetStateAction<UserSettings | undefined>>;
 }
@@ -17,7 +17,7 @@ const supportedKeys = [
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 ];
 
-const SettingsPage = ({ userSettings, setUserSettings }: SettingsPageProps) => {
+const GeneralPage = ({ userSettings, setUserSettings }: GeneralPageProps) => {
     const setHotkey = (hotkey: string) => {
         setUserSettings(userSettings => ({
             ...userSettings!,
@@ -86,7 +86,6 @@ const SettingsPage = ({ userSettings, setUserSettings }: SettingsPageProps) => {
                     console.log(s);
                     tauri.invoke('test', { hotkey: s });
                     setRecordingHotkey(false);
-                    // console.log(`lets record ${event.code} alt=${event.altKey} ctrl=${event.ctrlKey} shift=${event.shiftKey}`);
                 }
             }
         };
@@ -165,4 +164,4 @@ const SettingsPage = ({ userSettings, setUserSettings }: SettingsPageProps) => {
     )
 };
 
-export default SettingsPage;
+export default GeneralPage;

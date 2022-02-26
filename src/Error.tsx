@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AppBar, Box, Button, Toolbar, Typography } from '@mui/material'
-import { tauri, window } from '@tauri-apps/api';
+import { invoke, window } from '@tauri-apps/api';
 import { SentimentVeryDissatisfied } from '@mui/icons-material';
 
 const Error = () => {
@@ -15,9 +15,7 @@ const Error = () => {
         };
     }, []);
     useEffect(() => {
-        (async () => {
-            setErrorMessage(await tauri.invoke<string>('get_error_message'));
-        })();
+        invoke<string>('get_error_message').then(setErrorMessage).catch(console.error);
     }, []);
     useEffect(() => {
         window.getCurrent().show();
@@ -44,7 +42,7 @@ const Error = () => {
                 </Typography>
             </Box>
             <Toolbar sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-                <Button variant='contained' onClick={() => { tauri.invoke('exit') }}>
+                <Button variant='contained' onClick={() => { invoke('exit').catch(console.error) }}>
                     Close
                 </Button>
             </Toolbar>

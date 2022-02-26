@@ -7,11 +7,6 @@ import Overlay from './Overlay';
 import Settings from './Settings';
 import './index.scss';
 
-const theme = createTheme({
-  palette: {
-    mode: 'dark',
-  },
-});
 const windowLabel = window.getCurrent().label;
 ReactDOM.render(
   <React.StrictMode>
@@ -21,8 +16,12 @@ ReactDOM.render(
           <Overlay />
         )
         : (
-          <ThemeProvider theme={theme}>
-            <CssBaseline />
+          <ThemeProvider theme={createTheme({
+            palette: {
+              mode: 'dark',
+            },
+          })}>
+            <CssBaseline enableColorScheme />
             {
               windowLabel === 'settings' && (
                 <Settings />

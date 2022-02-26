@@ -535,7 +535,7 @@ fn get_modifier_id(
                 .values()
                 .map(|modifier| {
                     let (template, template_grayscale) =
-                        &MODIFIER_TEMPLATES.lock().unwrap()[&modifier.name];
+                        &MODIFIER_TEMPLATES.lock().unwrap()[modifier.name.as_str()];
                     (
                         modifier.id,
                         match_template(

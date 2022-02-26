@@ -64,18 +64,23 @@ pub enum Effect {
 
 /// A modifier.
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Modifier {
     pub id: ModifierId,
-    pub name: &'static str,
+    pub name: String,
     pub recipe: BTreeSet<ModifierId>,
+    #[serde(skip_serializing)]
     pub rewards: HashMap<RewardType, usize>,
+    #[serde(skip_serializing)]
     pub effect: Option<Effect>,
 }
 
 /// The list of all modifiers, indexed by id and recipe.
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Modifiers {
     pub by_id: HashMap<ModifierId, Modifier>,
+    #[serde(skip_serializing)]
     pub by_recipe: HashMap<BTreeSet<ModifierId>, Modifier>,
     pub components: HashMap<ModifierId, HashMap<ModifierId, usize>>,
 }

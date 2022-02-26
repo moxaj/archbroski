@@ -11,7 +11,7 @@ use crate::image::process_image;
 use crate::logic::suggest_modifier_id;
 use image::{Cache, ProcessImageResult, Rectangle};
 use itertools::Itertools;
-use logic::{Hotkey, ModifierId, UserSettings};
+use logic::{Hotkey, ModifierId, Modifiers, UserSettings, MODIFIERS};
 use opencv::core::{Mat, MatTraitConst};
 use opencv::imgproc::{cvt_color, COLOR_BGRA2BGR};
 use retry::delay::Fixed;
@@ -345,6 +345,11 @@ fn get_user_settings(
 }
 
 #[tauri::command(async)]
+fn get_modifiers() -> Modifiers {
+    MODIFIERS.clone()
+}
+
+#[tauri::command(async)]
 fn set_hotkey(
     app: tauri::AppHandle,
     user_settings_state: tauri::State<'_, Result<Mutex<UserSettings>, &'static str>>,
@@ -378,22 +383,16 @@ fn exit(app: tauri::AppHandle) {
     app.exit(0);
 }
 
-#[tauri::command(async)]
-fn test(hotkey: String) {
-    println!("raw hotkey: {}", hotkey);
-    if let Ok(accelerator) = Accelerator::from_str(hotkey.as_str()) {}
-}
-
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             get_monitor_size,
             get_error_message,
             get_user_settings,
+            get_modifiers,
             set_hotkey,
             hide_overlay_window,
             exit,
-            test,
         ])
         .system_tray(
             tauri::SystemTray::new()
