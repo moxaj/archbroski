@@ -11,7 +11,7 @@ Install the program using the [installer](https://www.google.com).
 After running the program, right click on the system tray icon and click `Settings`.
 
 Here you can find:
- - your recipes
+ - your combos
  - the activation hotkey
  - the calculation mode
  - the relative reward type weights, if using `Smart` mode
@@ -35,4 +35,4 @@ Then, ingame, whenever you approach an archnemesis statue, click its icon and pr
 
  ## 4. Having issues?
 
- Don't be shy, just open a bug report on GitHub. Also, if you are a seasoned rust or react dev, feel free to provide any feedback regarding the implementation.
+ Don't be shy, just open a bug report on [here](https://github.com/moxaj/archbroski/issues). Also, if you are a seasoned rust or react dev, feel free to provide any feedback regarding the implementation.

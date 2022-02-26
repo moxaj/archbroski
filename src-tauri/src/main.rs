@@ -7,6 +7,8 @@ mod image;
 mod logic;
 mod utils;
 
+use crate::image::process_image;
+use crate::logic::suggest_modifier_id;
 use image::{Cache, ProcessImageResult, Rectangle};
 use itertools::Itertools;
 use logic::{Hotkey, ModifierId, UserSettings};
@@ -19,14 +21,8 @@ use serde::Serialize;
 use std::collections::{BTreeSet, HashMap};
 use std::error::Error;
 use std::sync::Mutex;
-use tauri::{
-    generate_context, AppHandle, Builder, CustomMenuItem, GlobalShortcutManager, Icon, Manager,
-    SystemTray, SystemTrayEvent, SystemTrayMenu, Window, WindowBuilder, WindowUrl,
-};
+use tauri::{GlobalShortcutManager, Manager, WindowBuilder};
 use thiserror::Error;
-
-use crate::image::process_image;
-use crate::logic::suggest_modifier_id;
 
 #[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -44,18 +40,17 @@ impl Highlight {
     }
 }
 
+struct GlobalComputationId(u64);
+
 #[derive(Clone, Copy, Debug, Serialize)]
 #[serde(tag = "type")]
-enum InnerState {
+enum State {
     Hidden,
-    Computing,
+    Computing { id: u64 },
     Computed(Highlight),
     DetectionError,
     LogicError,
 }
-
-#[derive(Clone, Copy, Debug, Serialize)]
-struct State(InnerState);
 
 struct Screenshot {
     buffer: Vec<u8>,
@@ -84,10 +79,10 @@ pub enum ActivationError {
     LogicError,
 }
 
-fn create_settings_window(app: &AppHandle) {
+fn create_settings_window(app: &tauri::AppHandle) {
     app.create_window(
         "settings",
-        WindowUrl::App("index.html".into()),
+        tauri::WindowUrl::App("index.html".into()),
         move |window_builder, attributes| {
             (
                 window_builder
@@ -104,10 +99,10 @@ fn create_settings_window(app: &AppHandle) {
     .unwrap();
 }
 
-fn create_overlay_window(app: &AppHandle) {
+fn create_overlay_window(app: &tauri::AppHandle) {
     app.create_window(
         "overlay",
-        WindowUrl::App("index.html".into()),
+        tauri::WindowUrl::App("index.html".into()),
         move |window_builder, attributes| {
             (
                 window_builder
@@ -125,10 +120,10 @@ fn create_overlay_window(app: &AppHandle) {
     .unwrap();
 }
 
-fn create_error_window(app: &AppHandle) {
+fn create_error_window(app: &tauri::AppHandle) {
     app.create_window(
         "error",
-        WindowUrl::App("index.html".into()),
+        tauri::WindowUrl::App("index.html".into()),
         move |window_builder, attributes| {
             (
                 window_builder
@@ -144,7 +139,7 @@ fn create_error_window(app: &AppHandle) {
     .unwrap();
 }
 
-fn show_settings_window(app: &AppHandle) {
+fn show_settings_window(app: &tauri::AppHandle) {
     if let Some(settings_window) = app.get_window("settings") {
         settings_window.unminimize().unwrap();
         settings_window.set_focus().unwrap();
@@ -153,7 +148,15 @@ fn show_settings_window(app: &AppHandle) {
     }
 }
 
-fn set_initial_hotkey(app: &AppHandle) {
+fn get_state(app: &tauri::AppHandle) -> State {
+    *app.state::<Mutex<State>>().lock().unwrap()
+}
+
+fn set_state(app: &tauri::AppHandle, state: State) {
+    *app.state::<Mutex<State>>().lock().unwrap() = state;
+}
+
+fn set_initial_hotkey(app: &tauri::AppHandle) {
     if let Ok(user_settings) = &*app.state::<Result<Mutex<UserSettings>, &'static str>>() {
         let app_ = app.clone();
         app.global_shortcut_manager()
@@ -164,34 +167,37 @@ fn set_initial_hotkey(app: &AppHandle) {
     }
 }
 
-fn get_state(app: &AppHandle) -> InnerState {
-    app.state::<Mutex<State>>().lock().unwrap().0
-}
-
-fn set_state(app: &AppHandle, inner_state: InnerState) {
-    app.state::<Mutex<State>>().lock().unwrap().0 = inner_state;
-}
-
-fn update_overlay(app: &AppHandle, inner_state: InnerState) {
+fn update_overlay(app: &tauri::AppHandle, state: State) {
     let app_ = app.clone();
     app.run_on_main_thread(move || {
-        set_state(&app_, inner_state);
+        set_state(&app_, state);
         app_.get_window("overlay")
             .unwrap()
-            .emit("update", inner_state)
+            .emit("update", state)
             .unwrap();
     })
     .unwrap();
 }
 
-fn activate(app: &AppHandle) {
-    if !matches!(get_state(app), InnerState::Hidden) {
+fn activate(app: &tauri::AppHandle) {
+    if !matches!(get_state(app), State::Hidden) {
         return;
     }
 
+    let global_computation_id_state = app.state::<Mutex<GlobalComputationId>>();
+    let mut global_computation_id_mutex = global_computation_id_state.lock().unwrap();
+    global_computation_id_mutex.0 += 1;
+    let current_computation_id = global_computation_id_mutex.0;
+    update_overlay(
+        app,
+        State::Computing {
+            id: current_computation_id,
+        },
+    );
+    drop(global_computation_id_mutex);
+
     let app_ = app.clone();
     std::thread::spawn(move || {
-        update_overlay(&app_, InnerState::Computing);
         if let Err(error) = Display::primary()
             .map_err(|_| ActivationError::DetectionError)
             .and_then(|display| Capturer::new(display).map_err(|_| ActivationError::DetectionError))
@@ -273,32 +279,38 @@ fn activate(app: &AppHandle) {
                             .iter()
                             .next()
                             .unwrap();
-                        if matches!(get_state(&app_), InnerState::Computing) {
-                            update_overlay(
-                                &app_,
-                                InnerState::Computed(Highlight::new(
-                                    stash_area,
-                                    suggested_cell_area,
-                                )),
-                            );
+                        if let State::Computing { id } = get_state(&app_) {
+                            if id == current_computation_id {
+                                update_overlay(
+                                    &app_,
+                                    State::Computed(Highlight::new(
+                                        stash_area,
+                                        suggested_cell_area,
+                                    )),
+                                );
+                            }
                         }
                     })
                 },
             )
         {
-            update_overlay(
-                &app_,
-                match error {
-                    ActivationError::DetectionError => InnerState::DetectionError,
-                    ActivationError::LogicError => InnerState::LogicError,
-                },
-            );
+            if let State::Computing { id } = get_state(&app_) {
+                if id == current_computation_id {
+                    update_overlay(
+                        &app_,
+                        match error {
+                            ActivationError::DetectionError => State::DetectionError,
+                            ActivationError::LogicError => State::LogicError,
+                        },
+                    );
+                }
+            }
         }
     });
 }
 
-#[tauri::command]
-fn get_monitor_size(window: Window) -> (u32, u32) {
+#[tauri::command(async)]
+fn get_monitor_size(window: tauri::Window) -> (u32, u32) {
     if let Ok(Some(monitor)) = window.primary_monitor() {
         (monitor.size().width, monitor.size().height)
     } else {
@@ -306,36 +318,38 @@ fn get_monitor_size(window: Window) -> (u32, u32) {
     }
 }
 
-#[tauri::command]
-fn get_error_message(app: AppHandle) -> Option<&'static str> {
-    app.state::<Result<Mutex<UserSettings>, &'static str>>()
+#[tauri::command(async)]
+fn get_error_message(
+    user_settings_state: tauri::State<'_, Result<Mutex<UserSettings>, &'static str>>,
+    cache_state: tauri::State<'_, Result<Mutex<Cache>, &'static str>>,
+) -> Option<&'static str> {
+    user_settings_state
         .as_ref()
         .err()
         .copied()
-        .or_else(|| {
-            app.state::<Result<Mutex<Cache>, &'static str>>()
-                .as_ref()
-                .err()
-                .copied()
-        })
+        .or_else(|| cache_state.as_ref().err().copied())
 }
 
-#[tauri::command]
-fn exit(app: AppHandle) {
-    app.exit(0);
+#[tauri::command(async)]
+fn get_user_settings(
+    user_settings_state: tauri::State<'_, Result<Mutex<UserSettings>, &'static str>>,
+) -> UserSettings {
+    user_settings_state
+        .as_ref()
+        .unwrap()
+        .lock()
+        .unwrap()
+        .clone()
 }
 
-#[tauri::command]
-fn hide_overlay_window(app: AppHandle, overlay_window: Window) {
-    overlay_window.hide().unwrap();
-    set_state(&app, InnerState::Hidden);
-}
-
-#[tauri::command]
-fn set_hotkey(app: AppHandle, hotkey: Hotkey) {
-    let user_settings_state = app.state::<Result<Mutex<UserSettings>, &'static str>>();
-    let user_settings_state = user_settings_state.as_ref();
-    let mut user_settings = user_settings_state.unwrap().lock().unwrap();
+#[tauri::command(async)]
+fn set_hotkey(
+    app: tauri::AppHandle,
+    user_settings_state: tauri::State<'_, Result<Mutex<UserSettings>, &'static str>>,
+    hotkey: Hotkey,
+) {
+    let user_settings_state = user_settings_state.as_ref().unwrap();
+    let mut user_settings = user_settings_state.lock().unwrap();
     let accelerator = user_settings.hotkey.as_str();
     app.global_shortcut_manager()
         .unregister(accelerator)
@@ -351,37 +365,40 @@ fn set_hotkey(app: AppHandle, hotkey: Hotkey) {
     user_settings.hotkey = hotkey;
 }
 
-#[tauri::command]
-fn get_user_settings(app: AppHandle) -> UserSettings {
-    app.state::<Result<Mutex<UserSettings>, &'static str>>()
-        .as_ref()
-        .unwrap()
-        .lock()
-        .unwrap()
-        .clone()
+#[tauri::command(async)]
+fn hide_overlay_window(app: tauri::AppHandle, overlay_window: tauri::Window) {
+    overlay_window.hide().unwrap();
+    set_state(&app, State::Hidden);
+}
+
+#[tauri::command(async)]
+fn exit(app: tauri::AppHandle) {
+    app.exit(0);
 }
 
 fn main() {
-    Builder::default()
+    tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             get_monitor_size,
             get_error_message,
-            exit,
-            hide_overlay_window,
+            get_user_settings,
             set_hotkey,
-            get_user_settings
+            hide_overlay_window,
+            exit,
         ])
         .system_tray(
-            SystemTray::new()
-                .with_icon(Icon::Raw(include_bytes!("../icons/icon.ico").to_vec()))
+            tauri::SystemTray::new()
+                .with_icon(tauri::Icon::Raw(
+                    include_bytes!("../icons/icon.ico").to_vec(),
+                ))
                 .with_menu(
-                    SystemTrayMenu::new()
-                        .add_item(CustomMenuItem::new("settings", "Settings"))
-                        .add_item(CustomMenuItem::new("quit", "Quit")),
+                    tauri::SystemTrayMenu::new()
+                        .add_item(tauri::CustomMenuItem::new("settings", "Settings"))
+                        .add_item(tauri::CustomMenuItem::new("quit", "Quit")),
                 ),
         )
         .on_system_tray_event(move |app, event| {
-            if let SystemTrayEvent::MenuItemClick { id, .. } = event {
+            if let tauri::SystemTrayEvent::MenuItemClick { id, .. } = event {
                 match id.as_str() {
                     "settings" => show_settings_window(app),
                     "quit" => app.exit(0),
@@ -400,10 +417,16 @@ fn main() {
                     .map(Mutex::new)
                     .map_err(|_| "failed_to_load_cache"),
             );
-            if get_error_message(app.handle()).is_some() {
+            if get_error_message(
+                app.state::<Result<Mutex<UserSettings>, &'static str>>(),
+                app.state::<Result<Mutex<Cache>, &'static str>>(),
+            )
+            .is_some()
+            {
                 create_error_window(&app.handle());
             } else {
-                app.manage(Mutex::new(State(InnerState::Hidden)));
+                app.manage(Mutex::new(GlobalComputationId(0)));
+                app.manage(Mutex::new(State::Hidden));
 
                 create_overlay_window(&app.handle());
                 set_initial_hotkey(&app.handle());
@@ -411,6 +434,6 @@ fn main() {
 
             Ok(())
         })
-        .run(generate_context!())
+        .run(tauri::generate_context!())
         .unwrap();
 }
