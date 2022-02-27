@@ -1,8 +1,7 @@
 use crate::collection;
 use crate::logic::{ModifierId, MODIFIERS};
-use bincode::{deserialize_from, serialize_into};
+use crate::utils::{BincodeDiscSynchronized, DiscSynchronized};
 use dashmap::DashMap;
-use dirs::config_dir;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use opencv::core::{min_max_loc, Point, Scalar, CV_32F, CV_8U};
@@ -22,8 +21,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
 use std::fs::File;
 use std::hash::{Hash, Hasher};
-use std::io::{BufReader, BufWriter, Error as IOError, ErrorKind};
-use std::path::PathBuf;
+use std::io::{BufReader, BufWriter};
 use std::sync::Mutex;
 use std::{collections::HashMap, error::Error, ops::Deref};
 
@@ -261,43 +259,32 @@ static MODIFIER_TEMPLATES: Lazy<Mutex<HashMap<&str, (Mat, Mat)>>> = Lazy::new(||
 /// A serializable cache.
 #[derive(Serialize, Deserialize)]
 struct SerializableCache {
-    images: HashMap<u64, Option<ModifierId>>,
     layout: Option<HashMap<u8, Vec2>>,
+    images: HashMap<u64, Option<ModifierId>>,
 }
 
-impl SerializableCache {
-    fn new(images: HashMap<u64, Option<ModifierId>>, layout: Option<HashMap<u8, Vec2>>) -> Self {
-        Self { images, layout }
+impl DiscSynchronized for SerializableCache {
+    fn new() -> Self {
+        Self {
+            layout: None,
+            images: HashMap::new(),
+        }
     }
 
-    fn output_path() -> Result<PathBuf, Box<dyn Error>> {
-        let mut path = config_dir()
-            .ok_or_else(|| IOError::new(ErrorKind::Other, "Cannot find home directory."))?;
-        path.push(PathBuf::from(r"archbro\.cache"));
-        Ok(path)
+    fn file_name() -> &'static str {
+        ".cache"
     }
 
-    fn save(&self) -> Result<(), Box<dyn Error>> {
-        let mut file = BufWriter::new(File::create(Self::output_path()?)?);
-        serialize_into(&mut file, self).map_err(Into::into)
+    fn save_impl(&self, writer: &mut BufWriter<File>) -> Result<(), Box<dyn Error>> {
+        <Self as BincodeDiscSynchronized>::save_impl(self, writer)
     }
 
-    fn new_saved() -> Result<Self, Box<dyn Error>> {
-        let cache = Self::new(HashMap::new(), None);
-        cache.save()?;
-        Ok(cache)
-    }
-
-    fn load() -> Result<Self, Box<dyn Error>> {
-        File::open(Self::output_path()?)
-            .map_err(Into::into)
-            .and_then(|file| deserialize_from(BufReader::new(file)).map_err(Into::into))
-    }
-
-    fn load_or_new_saved() -> Result<Self, Box<dyn Error>> {
-        Self::load().or_else(|_| Self::new_saved())
+    fn load_impl(reader: BufReader<File>) -> Result<Self, Box<dyn Error>> {
+        <Self as BincodeDiscSynchronized>::load_impl(reader)
     }
 }
+
+impl BincodeDiscSynchronized for SerializableCache {}
 
 #[derive(PartialEq, Eq)]
 pub struct CacheSnapshot {

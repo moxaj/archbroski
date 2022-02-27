@@ -1,7 +1,7 @@
 import React from 'react';
 import { invoke } from '@tauri-apps/api';
 import { Box, Button, Typography } from '@mui/material';
-import { CalculationMode, UserSettings } from './Settings';
+import { UserSettings } from './Settings';
 import WithLoading from './WithLoading';
 
 type GeneralPageProps = {
@@ -14,24 +14,6 @@ const GeneralPage = ({ userSettings, setUserSettings }: GeneralPageProps) => {
         setUserSettings(userSettings => ({
             ...userSettings!,
             hotkey
-        }));
-    };
-    const setCalculationMode = (calculationMode: CalculationMode) => {
-        setUserSettings(userSettings => ({
-            ...userSettings!,
-            calculationMode
-        }));
-    };
-    const setTimeBudgetMs = (timeBudgetMs: number) => {
-        setUserSettings(userSettings => ({
-            ...userSettings!,
-            timeBudgetMs
-        }));
-    };
-    const setPreference = (rewardType: string, value: number) => {
-        setUserSettings(userSettings => ({
-            ...userSettings!,
-            preferences: { ...userSettings!.preferences, [rewardType]: value }
         }));
     };
     const [recordingHotkey, setRecordingHotkey] = React.useState(false);
@@ -103,59 +85,6 @@ const GeneralPage = ({ userSettings, setUserSettings }: GeneralPageProps) => {
                 </Box>
             </Box>
         </WithLoading>
-
-
-        /*
-        <Grid container sx={{ flexGrow: 1 }}>
-            <Grid item xs={1}>
-                <Typography>
-                    Hotkey
-                </Typography>
-            </Grid>
-            <Grid item xs={3}>
-                <Button variant='outlined' sx={{ width: 200 }}>{userSettings.hotkey}</Button>
-            </Grid>
-            <Grid item xs={3}>
-                <Typography>
-                    Calculation mode
-                </Typography>
-            </Grid>
-            <Grid item xs={3}>
-                <ToggleButtonGroup
-                    sx={{ mx: 2 }}
-                    color='primary'
-                    value={mode}
-                    exclusive
-                    onChange={(_, mode) => updateMode(mode)}>
-                    <ToggleButton value='simple'>Simple</ToggleButton>
-                    <ToggleButton value='smart'>Smart</ToggleButton>
-                </ToggleButtonGroup>
-            </Grid>
-
-            <Box sx={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
-
-            </Box>
-            <Divider sx={{ m: 2 }} />
-            <Typography sx={{ textAlign: 'center', mb: 4 }}>
-                Relative reward values
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
-                {Object.keys(rewards).map(reward => (
-                    <TextField key={reward} label={reward} type='number' variant='standard'
-                        InputLabelProps={{
-                            shrink: true,
-                        }}
-                        inputProps={{
-                            min: 0, max: 10
-                        }}
-                        sx={{ width: 80, mx: 3, mb: 6 }}
-                        disabled={mode === 'simple'}
-                        value={rewards[reward]}
-                        onChange={(event) => { updateRewards(reward as RewardType, +event.target.value) }} />
-                ))}
-            </Box>
-        </Grid>
-        */
     )
 };
 

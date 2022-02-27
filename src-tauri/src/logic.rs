@@ -1,31 +1,31 @@
-use dirs::config_dir;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering::Equal;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::error::Error;
-use std::fs::{create_dir_all, File, OpenOptions};
-use std::io::{BufReader, ErrorKind};
-use std::io::{Error as IOError, Write};
-use std::path::PathBuf;
+use std::fs::File;
+use std::io::BufReader;
 use std::sync::Mutex;
 use std::time::Instant;
-use CalculationMode::*;
 use Effect::*;
-use RewardType::*;
+use Reward::*;
 
+use crate::utils::{DiscSynchronized, JsonDiscSynchronized};
 use crate::{collection, memoized};
 
 /// The length of the queue.
 const QUEUE_LENGTH: usize = 4;
 
+/// The time budget for trying to find the best combo.
+const TIME_BUDGET_MS: u128 = 100;
+
 /// The id of a modifier.
 pub type ModifierId = u8;
 
-/// The type of a reward.
+/// A reward.
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, Serialize, Deserialize)]
-pub enum RewardType {
+pub enum Reward {
     Generic,
     Armour,
     Weapon,
@@ -53,14 +53,46 @@ pub enum RewardType {
     Treant,
 }
 
+static REWARD_VALUES: Lazy<HashMap<Reward, u32>> = Lazy::new(|| {
+    collection![
+        Generic => 1,
+        Armour => 1,
+        Weapon => 1,
+        Jewelry => 1,
+        Gem => 5,
+        Map => 10,
+        DivinationCard => 25,
+        Fragment => 10,
+        Essence => 5,
+        Harbinger => 25,
+        Unique => 10,
+        Delve => 5,
+        Blight => 5,
+        Ritual => 5,
+        Currency => 25,
+        Legion => 10,
+        Breach => 5,
+        Labyrinth => 5,
+        Scarab => 25,
+        Abyss => 5,
+        Heist => 5,
+        Expedition => 10,
+        Delirium => 10,
+        Metamorph => 5,
+        Treant => 1,
+    ]
+});
+
 /// The effect of a recipe.
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum Effect {
     Reroll { count: usize },
     AdditionalReward,
     DoubledReward,
-    Convert { to: RewardType },
+    Convert { to: Reward },
 }
+
+const REROLL_MULTIPLIER: f64 = 0.25;
 
 /// A modifier.
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
@@ -70,7 +102,7 @@ pub struct Modifier {
     pub name: String,
     pub recipe: BTreeSet<ModifierId>,
     #[serde(skip_serializing)]
-    pub rewards: HashMap<RewardType, usize>,
+    pub rewards: HashMap<Reward, usize>,
     #[serde(skip_serializing)]
     pub effect: Option<Effect>,
 }
@@ -133,14 +165,6 @@ impl Modifiers {
 /// All information related to the modifiers.
 pub static MODIFIERS: Lazy<Modifiers> = Lazy::new(Modifiers::new);
 
-/// The calculation mode.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum CalculationMode {
-    Basic,
-    Smart,
-}
-
 /// A hotkey.
 pub type Hotkey = String;
 
@@ -148,79 +172,47 @@ pub type Hotkey = String;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserSettings {
-    pub combos: Vec<Vec<ModifierId>>,
+    pub combos: Vec<(u64, Vec<ModifierId>)>,
     pub forbidden_modifier_ids: HashSet<ModifierId>,
-    pub calculation_mode: CalculationMode,
-    pub preferences: HashMap<RewardType, usize>,
-    pub time_budget_ms: u64,
     pub hotkey: String,
 }
 
-impl UserSettings {
-    pub fn load() -> Result<Self, Box<dyn Error>> {
-        let mut path = config_dir()
-            .ok_or_else(|| IOError::new(ErrorKind::Other, "Cannot find home directory."))?;
-        path.push(PathBuf::from(r"archbro\settings.json"));
-
-        File::open(path.clone())
-            .map_err(Into::into)
-            .and_then(|file| serde_json::from_reader(BufReader::new(file)).map_err(Into::into))
-            .or_else(|_: Box<dyn Error>| {
-                if let Some(parent) = path.parent() {
-                    create_dir_all(parent)?;
-                }
-
-                let user_settings = UserSettings {
-                    combos: collection![],
-                    forbidden_modifier_ids: collection![],
-                    calculation_mode: Basic,
-                    preferences: collection! {
-                        Generic => 1,
-                        Armour => 1,
-                        Weapon => 1,
-                        Jewelry => 1,
-                        Gem => 1,
-                        Map => 1,
-                        DivinationCard => 1,
-                        Fragment => 1,
-                        Essence => 1,
-                        Harbinger => 1,
-                        Unique => 1,
-                        Delve => 1,
-                        Blight => 1,
-                        Ritual => 1,
-                        Currency => 10,
-                        Legion => 1,
-                        Breach => 1,
-                        Labyrinth => 1,
-                        Scarab => 1,
-                        Abyss => 1,
-                        Heist => 1,
-                        Expedition => 1,
-                        Delirium => 1,
-                        Metamorph => 1,
-                        Treant => 1,
-                    },
-                    time_budget_ms: 1000,
-                    hotkey: "ctrl + d".to_owned(),
-                };
-                writeln!(
-                    OpenOptions::new().create(true).write(true).open(path)?,
-                    "{}",
-                    serde_json::to_string_pretty(&user_settings)?
-                )?;
-                Ok(user_settings)
-            })
+impl DiscSynchronized for UserSettings {
+    fn new() -> Self {
+        Self {
+            combos: collection![],
+            forbidden_modifier_ids: collection![],
+            hotkey: "ctrl + d".to_owned(),
+        }
     }
 
+    fn file_name() -> &'static str {
+        "archbroski\\settings.json"
+    }
+
+    fn save_impl(&self, writer: &mut std::io::BufWriter<File>) -> Result<(), Box<dyn Error>> {
+        <Self as JsonDiscSynchronized>::save_impl(self, writer)
+    }
+
+    fn load_impl(reader: BufReader<File>) -> Result<Self, Box<dyn Error>> {
+        <Self as JsonDiscSynchronized>::load_impl(reader)
+    }
+}
+
+impl JsonDiscSynchronized for UserSettings {}
+
+impl UserSettings {
     pub fn get_filler_modifier_ids(&self) -> HashSet<ModifierId> {
-        let used_modifiers = self
+        let used_modifier_ids = self
             .combos
             .iter()
+            .map(|(_, combo)| combo)
             .flat_map(|combo| {
-                combo
-                    .iter()
-                    .flat_map(|modifier_id| MODIFIERS.components[modifier_id].keys())
+                combo.iter().flat_map(|modifier_id| {
+                    MODIFIERS.components[modifier_id]
+                        .keys()
+                        .chain(std::iter::once(modifier_id))
+                })
             })
             .copied()
             .collect::<HashSet<_>>();
@@ -228,7 +220,7 @@ impl UserSettings {
             .by_id
             .keys()
             .filter(|&modifier_id| {
-                !used_modifiers.contains(modifier_id)
+                !used_modifier_ids.contains(modifier_id)
                     && !self.forbidden_modifier_ids.contains(modifier_id)
             })
             .copied()
@@ -246,7 +238,7 @@ fn has_modifier(stash: &BTreeMap<ModifierId, usize>, modifier_id: ModifierId) ->
 }
 
 /// Returns the value of the given combo.
-fn get_combo_value(user_settings: &UserSettings, combo: &[ModifierId]) -> f32 {
+fn get_combo_value(combo: &[ModifierId]) -> f32 {
     (0..combo.len()).fold(0f32, |value, index| {
         let modifiers = (0..index + 1)
             .map(|index| &MODIFIERS.by_id[&combo[index]])
@@ -278,30 +270,25 @@ fn get_combo_value(user_settings: &UserSettings, combo: &[ModifierId]) -> f32 {
                 rewards
             },
         );
-        if let Some(&converted_reward_type) =
-            effects.iter().fold(None, |converted_reward_type, &effect| {
-                if let Convert { to } = effect {
-                    Some(to)
-                } else {
-                    converted_reward_type
-                }
-            })
-        {
-            rewards = collection! {converted_reward_type => rewards.values().sum()}
+        if let Some(&converted_reward) = effects.iter().fold(None, |converted_reward, &effect| {
+            if let Convert { to } = effect {
+                Some(to)
+            } else {
+                converted_reward
+            }
+        }) {
+            rewards = collection! {converted_reward => rewards.values().sum()}
         }
 
         value
             + rewards
                 .into_iter()
-                .map(|(reward_type, reward_count)| {
-                    let base_reward_value = match &user_settings.calculation_mode {
-                        Basic => 1,
-                        Smart => user_settings.preferences[&reward_type],
-                    };
+                .map(|(reward, reward_count)| {
+                    let base_reward_value = REWARD_VALUES[&reward];
                     base_reward_value as f32
                         * (reward_count + additional_reward_count) as f32
                         * (if doubled_rewards { 2 } else { 1 }) as f32
-                        * (1 + reroll_count / 4) as f32
+                        * (1.0 + reroll_count as f64 * REROLL_MULTIPLIER) as f32
                 })
                 .sum::<f32>()
     })
@@ -345,7 +332,6 @@ fn get_produced_modifier_ids(combo: &[ModifierId]) -> HashSet<ModifierId> {
 
 /// Returns the highest valued combo and its value for the given unordered combo (considering the current queue as well).
 fn get_unordered_combo_value(
-    user_settings: &UserSettings,
     queue: &[ModifierId],
     combo: &BTreeSet<ModifierId>,
     required_modifier_ids: &HashSet<ModifierId>,
@@ -360,7 +346,7 @@ fn get_unordered_combo_value(
             if get_produced_modifier_ids(&combo_permutation).is_superset(required_modifier_ids) {
                 Some((
                     combo_permutation.clone(),
-                    get_combo_value(user_settings, &combo_permutation),
+                    get_combo_value(&combo_permutation),
                 ))
             } else {
                 None
@@ -380,6 +366,7 @@ pub fn suggest_modifier_id(
         user_settings
             .combos
             .iter()
+            .map(|(_, combo)| combo)
             .find(|&combo| {
                 (0..queue.len()).all(|index| queue[index] == combo[index])
                     && combo
@@ -389,9 +376,11 @@ pub fn suggest_modifier_id(
             })
             .cloned()
             .or_else(|| {
+                let filler_modifiers_ids = user_settings.get_filler_modifier_ids();
                 let mut modifier_ids = user_settings
                     .combos
                     .iter()
+                    .map(|(_, combo)| combo)
                     .flat_map(|combo| {
                         combo
                             .iter()
@@ -460,8 +449,7 @@ pub fn suggest_modifier_id(
                     })
                     .collect_vec();
                 modifier_ids.extend(
-                    user_settings
-                        .get_filler_modifier_ids()
+                    filler_modifiers_ids
                         .iter()
                         .filter(|&&modifier_id| has_modifier(&stash, modifier_id))
                         .map(|&modifier_id| (None, collection![modifier_id])),
@@ -470,11 +458,10 @@ pub fn suggest_modifier_id(
                 let mut indices = vec![-1i32];
                 let mut suggested_combo_and_value: Option<(Vec<ModifierId>, f32)> = None;
                 loop {
-                    if let Smart = user_settings.calculation_mode {
-                        if time_before.elapsed().as_millis() > user_settings.time_budget_ms as u128
-                        {
-                            break;
-                        }
+                    if time_before.elapsed().as_millis() > TIME_BUDGET_MS
+                        && suggested_combo_and_value.is_some()
+                    {
+                        break;
                     }
 
                     if let Some(index) = indices.pop() {
@@ -501,14 +488,6 @@ pub fn suggest_modifier_id(
                                     .collect_vec();
                                 recipes.push(recipe.clone());
 
-                                /*
-                                let queue_set = queue.iter().copied().collect::<BTreeSet<_>>();
-                                recipes = recipes
-                                    .into_iter()
-                                    .map(|recipe| recipe.difference(&queue_set).copied().collect())
-                                    .collect();
-                                */
-
                                 let mut combo = recipes.iter().fold(
                                     BTreeSet::<ModifierId>::new(),
                                     |mut combo, recipe| {
@@ -525,34 +504,33 @@ pub fn suggest_modifier_id(
                                     return None;
                                 }
 
-                                get_unordered_combo_value(
-                                    user_settings,
-                                    &queue,
-                                    &combo,
-                                    &produced_modifier_ids,
-                                )
-                                .map(|(combo, value)| (index, combo, value))
+                                get_unordered_combo_value(&queue, &combo, &produced_modifier_ids)
+                                    .map(|(combo, value)| (index, combo, value))
                             })
                         {
-                            let (suggested_combo, suggested_value) =
-                                suggested_combo_and_value.unwrap_or_default();
-                            if combo.len() > suggested_combo.len()
-                                || combo.len() == suggested_combo.len() && value > suggested_value
+                            if combo.len() == QUEUE_LENGTH as usize
+                                && combo
+                                    .iter()
+                                    .filter(|&modifier_id| {
+                                        filler_modifiers_ids.contains(modifier_id)
+                                    })
+                                    .count()
+                                    <= 1
                             {
-                                suggested_combo_and_value = Some((combo.clone(), value));
-                            } else {
-                                suggested_combo_and_value =
-                                    Some((suggested_combo, suggested_value));
+                                suggested_combo_and_value = Some((combo, value));
+                                break;
                             }
 
-                            if combo.len() == QUEUE_LENGTH as usize {
-                                if let Basic = user_settings.calculation_mode {
-                                    break;
-                                }
-                            } else {
-                                indices.push(index as i32);
-                                indices.push(index as i32);
+                            if suggested_combo_and_value.is_none() || {
+                                let (combo_, value_) = suggested_combo_and_value.as_ref().unwrap();
+                                combo.len() > combo_.len()
+                                    || combo.len() == combo_.len() && value > *value_
+                            } {
+                                suggested_combo_and_value = Some((combo, value));
                             }
+
+                            indices.push(index as i32);
+                            indices.push(index as i32);
                         }
                     } else {
                         break;

@@ -20,11 +20,16 @@ use scrap::{Capturer, Display};
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap};
 use std::error::Error;
-use std::str::FromStr;
+use std::ffi::c_void;
 use std::sync::Mutex;
-use tao::accelerator::Accelerator;
 use tauri::{GlobalShortcutManager, Manager, WindowBuilder};
 use thiserror::Error;
+use utils::DiscSynchronized;
+#[cfg(target_os = "windows")]
+use windows::Win32::{
+    Foundation::{BOOL, HWND},
+    Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_TRANSITIONS_FORCEDISABLED},
+};
 
 #[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -89,7 +94,7 @@ fn create_settings_window(app: &tauri::AppHandle) {
             (
                 window_builder
                     .title("Archbroski")
-                    .inner_size(1200f64, 650f64)
+                    .inner_size(1200f64, 700f64)
                     .decorations(false)
                     .resizable(false)
                     .visible(false)
@@ -102,24 +107,38 @@ fn create_settings_window(app: &tauri::AppHandle) {
 }
 
 fn create_overlay_window(app: &tauri::AppHandle) {
-    app.create_window(
-        "overlay",
-        tauri::WindowUrl::App("index.html".into()),
-        move |window_builder, attributes| {
-            (
-                window_builder
-                    .resizable(false)
-                    .decorations(false)
-                    .transparent(true)
-                    .visible(false)
-                    .always_on_top(true)
-                    .position(0f64, 0f64)
-                    .skip_taskbar(true),
-                attributes,
-            )
-        },
-    )
-    .unwrap();
+    let overlay_window = app
+        .create_window(
+            "overlay",
+            tauri::WindowUrl::App("index.html".into()),
+            move |window_builder, attributes| {
+                (
+                    window_builder
+                        .resizable(false)
+                        .decorations(false)
+                        .transparent(true)
+                        .visible(false)
+                        .always_on_top(true)
+                        .position(0f64, 0f64)
+                        .skip_taskbar(true),
+                    attributes,
+                )
+            },
+        )
+        .unwrap();
+
+    if cfg!(target_os = "windows") {
+        if let Ok(hwnd) = overlay_window.hwnd() {
+            unsafe {
+                let _ = DwmSetWindowAttribute(
+                    std::mem::transmute::<*mut c_void, HWND>(hwnd),
+                    DWMWA_TRANSITIONS_FORCEDISABLED,
+                    &mut BOOL::from(true) as *mut _ as *mut c_void,
+                    std::mem::size_of::<BOOL>() as u32,
+                );
+            }
+        }
+    }
 }
 
 fn create_error_window(app: &tauri::AppHandle) {
@@ -349,6 +368,18 @@ fn get_user_settings(
 }
 
 #[tauri::command(async)]
+fn set_user_settings(
+    user_settings_state: tauri::State<'_, Result<Mutex<UserSettings>, &'static str>>,
+    user_settings: UserSettings,
+) {
+    let saved_user_settings = user_settings.clone();
+    std::thread::spawn(move || {
+        let _ = saved_user_settings.save(); // TODO handle error
+    });
+    *user_settings_state.as_ref().unwrap().lock().unwrap() = user_settings;
+}
+
+#[tauri::command(async)]
 fn get_modifiers() -> Modifiers {
     MODIFIERS.clone()
 }
@@ -393,6 +424,7 @@ fn main() {
             get_monitor_size,
             get_error_message,
             get_user_settings,
+            set_user_settings,
             get_modifiers,
             set_hotkey,
             hide_overlay_window,
@@ -420,7 +452,7 @@ fn main() {
         })
         .setup(|app| {
             app.manage(
-                UserSettings::load()
+                UserSettings::load_or_new_saved()
                     .map(Mutex::new)
                     .map_err(|_| "failed_to_load_user_settings"),
             );
@@ -439,7 +471,6 @@ fn main() {
             } else {
                 app.manage(Mutex::new(GlobalComputationId(0)));
                 app.manage(Mutex::new(State::Hidden));
-
                 create_overlay_window(&app.handle());
                 set_initial_hotkey(&app.handle());
             }

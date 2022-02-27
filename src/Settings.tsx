@@ -19,39 +19,9 @@ export type Modifiers = {
     components: { [key: number]: { [key: number]: number } }
 };
 
-export type RewardType = 'Generic'
-    | 'Armour'
-    | 'Weapon'
-    | 'Jewelry'
-    | 'Gem'
-    | 'Map'
-    | 'DivinationCard'
-    | 'Fragment'
-    | 'Essence'
-    | 'Harbinger'
-    | 'Unique'
-    | 'Delve'
-    | 'Blight'
-    | 'Ritual'
-    | 'Currency'
-    | 'Legion'
-    | 'Breach'
-    | 'Labyrinth'
-    | 'Scarab'
-    | 'Abyss'
-    | 'Heist'
-    | 'Expedition'
-    | 'Delirium'
-    | 'Metamorph';
-
-export type CalculationMode = 'Simple' | 'Smart';
-
 export type UserSettings = {
-    combos: number[][];
+    combos: [number, number[]][];
     forbiddenModifierIds: number[];
-    calculationMode: CalculationMode;
-    preferences: { [key: string]: number };
-    timeBudgetMs: number;
     hotkey: string;
 };
 
@@ -72,6 +42,18 @@ const Settings = () => {
             })
             .catch(console.error);
     }, []);
+    React.useEffect(() => {
+        if (userSettings === undefined) {
+            return;
+        }
+
+        invoke('set_user_settings', {
+            userSettings: {
+                ...userSettings,
+                combos: userSettings.combos.filter(([_, combo]) => new Set(combo).size === combo.length)
+            }
+        }).catch(console.error);
+    }, [userSettings]);
     return (
         <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
             <AppBar position='fixed' sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
