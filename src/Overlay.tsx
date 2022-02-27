@@ -75,8 +75,8 @@ const Overlay = () => {
             }
 
             let currentWindow = window.getCurrent();
-            let [monitorWidth, monitorHeight] = await invoke<[number, number]>('get_monitor_size');
-            currentWindow.setSize(new window.PhysicalSize(monitorWidth, monitorHeight));
+            let [monitorWidth, monitorHeight, scaleFactor] = await invoke<[number, number, number]>('get_monitor_size');
+            await currentWindow.setSize(new window.PhysicalSize(monitorWidth, monitorHeight));
 
             const canvas = canvasRef.current!;
             canvas.width = monitorWidth;
@@ -87,10 +87,18 @@ const Overlay = () => {
             const ctx = canvas.getContext('2d')!;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (state.type === 'Computed') {
-                const { stashArea: stash_area, suggestedCellArea: suggested_cell_area } = state;
+                const { stashArea, suggestedCellArea } = state;
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-                ctx.fillRect(stash_area.x, stash_area.y, stash_area.width, stash_area.height);
-                ctx.clearRect(suggested_cell_area.x, suggested_cell_area.y, suggested_cell_area.width, suggested_cell_area.height);
+                ctx.fillRect(
+                    stashArea.x / scaleFactor,
+                    stashArea.y / scaleFactor,
+                    stashArea.width / scaleFactor,
+                    stashArea.height / scaleFactor);
+                ctx.clearRect(
+                    suggestedCellArea.x / scaleFactor,
+                    suggestedCellArea.y / scaleFactor,
+                    suggestedCellArea.width / scaleFactor,
+                    suggestedCellArea.height / scaleFactor);
             }
 
             setTimeout(async () => {

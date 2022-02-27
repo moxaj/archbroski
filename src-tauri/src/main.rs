@@ -88,8 +88,8 @@ fn create_settings_window(app: &tauri::AppHandle) {
         move |window_builder, attributes| {
             (
                 window_builder
-                    .title("Archbro")
-                    .inner_size(1000f64, 600f64)
+                    .title("Archbroski")
+                    .inner_size(1200f64, 650f64)
                     .decorations(false)
                     .resizable(false)
                     .visible(false)
@@ -312,11 +312,15 @@ fn activate(app: &tauri::AppHandle) {
 }
 
 #[tauri::command(async)]
-fn get_monitor_size(window: tauri::Window) -> (u32, u32) {
+fn get_monitor_size(window: tauri::Window) -> (u32, u32, f64) {
     if let Ok(Some(monitor)) = window.primary_monitor() {
-        (monitor.size().width, monitor.size().height)
+        (
+            monitor.size().width,
+            monitor.size().height,
+            monitor.scale_factor(),
+        )
     } else {
-        (0, 0)
+        (0, 0, 1.0)
     }
 }
 
