@@ -1,21 +1,13 @@
-import { Help } from '@mui/icons-material';
-import { Box, Button, Divider, Grid, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@mui/material';
-import { styled } from '@mui/system';
-import { useEffect, useState, Dispatch, SetStateAction } from 'react';
-import { CalculationMode, RewardType, UserSettings } from './Settings';
-import { tauri, window } from '@tauri-apps/api';
+import React from 'react';
+import { invoke } from '@tauri-apps/api';
+import { Box, Button, Typography } from '@mui/material';
+import { CalculationMode, UserSettings } from './Settings';
+import WithLoading from './WithLoading';
 
 type GeneralPageProps = {
     userSettings: UserSettings;
-    setUserSettings: Dispatch<SetStateAction<UserSettings | undefined>>;
+    setUserSettings: React.Dispatch<React.SetStateAction<UserSettings | undefined>>;
 }
-
-const supportedKeys = [
-    // Function keys
-    'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
-    // Numbers
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-];
 
 const GeneralPage = ({ userSettings, setUserSettings }: GeneralPageProps) => {
     const setHotkey = (hotkey: string) => {
@@ -42,8 +34,8 @@ const GeneralPage = ({ userSettings, setUserSettings }: GeneralPageProps) => {
             preferences: { ...userSettings!.preferences, [rewardType]: value }
         }));
     };
-    const [recordingHotkey, setRecordingHotkey] = useState(false);
-    useEffect(() => {
+    const [recordingHotkey, setRecordingHotkey] = React.useState(false);
+    React.useEffect(() => {
         const keydownListener = (event: KeyboardEvent) => {
             if (recordingHotkey) {
                 if (event.key === 'Escape') {
@@ -56,7 +48,7 @@ const GeneralPage = ({ userSettings, setUserSettings }: GeneralPageProps) => {
             document.removeEventListener('keydown', keydownListener);
         };
     }, [recordingHotkey]);
-    useEffect(() => {
+    React.useEffect(() => {
         const keydownListener = (event: KeyboardEvent) => {
             event.preventDefault();
             if (recordingHotkey) {
@@ -84,7 +76,7 @@ const GeneralPage = ({ userSettings, setUserSettings }: GeneralPageProps) => {
                     }
 
                     console.log(s);
-                    tauri.invoke('test', { hotkey: s });
+                    invoke('test', { hotkey: s });
                     setRecordingHotkey(false);
                 }
             }
@@ -95,20 +87,23 @@ const GeneralPage = ({ userSettings, setUserSettings }: GeneralPageProps) => {
         };
     }, [recordingHotkey]);
     return (
-        <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ display: 'flex' }}>
-                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                    <Typography>
-                        Hotkey
-                    </Typography>
-                    <Button variant='outlined' sx={{ width: 200 }} onClick={() => { setRecordingHotkey(true) }}>
-                        {recordingHotkey
-                            ? 'Press a key...'
-                            : userSettings.hotkey}
-                    </Button>
+        <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
+            <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
+                <Box sx={{ display: 'flex' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                        <Typography>
+                            Hotkey
+                        </Typography>
+                        <Button variant='outlined' sx={{ width: 200 }} onClick={() => { setRecordingHotkey(true) }}>
+                            {recordingHotkey
+                                ? 'Press a key...'
+                                : userSettings.hotkey}
+                        </Button>
+                    </Box>
                 </Box>
             </Box>
-        </Box>
+        </WithLoading>
+
 
         /*
         <Grid container sx={{ flexGrow: 1 }}>

@@ -1,10 +1,10 @@
-import { createTheme, CssBaseline, ThemeProvider } from '@mui/material';
-import { window } from '@tauri-apps/api';
 import React from 'react';
 import ReactDOM from 'react-dom';
-import Error from './Error';
-import Overlay from './Overlay';
+import { window } from '@tauri-apps/api';
+import { createTheme, CssBaseline, ThemeProvider } from '@mui/material';
 import Settings from './Settings';
+import Overlay from './Overlay';
+import Error from './Error';
 import './index.scss';
 
 const windowLabel = window.getCurrent().label;

@@ -1,9 +1,8 @@
-import { Check, Error, Help } from '@mui/icons-material';
-import { CircularProgress, Fade, Grow } from '@mui/material';
+import React from 'react';
+import { window, invoke } from '@tauri-apps/api';
 import { Box } from '@mui/system';
-import { invoke, tauri, window } from '@tauri-apps/api';
-import { UnlistenFn } from '@tauri-apps/api/event';
-import { useEffect, useRef, useState } from 'react';
+import { CircularProgress, Fade, Grow } from '@mui/material';
+import { Check, Error, Help } from '@mui/icons-material';
 
 type Rectangle = {
     x: number;
@@ -27,9 +26,9 @@ type State = {
 };
 
 const Overlay = () => {
-    const [state, setState] = useState<State>({ type: 'Hidden' });
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
-    useEffect(() => {
+    const [state, setState] = React.useState<State>({ type: 'Hidden' });
+    const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+    React.useEffect(() => {
         const unlisten = window.getCurrent().listen('tauri://blur', () => {
             setState(state_ => {
                 return state_.type === 'Hidden' ? state_ : { type: 'Hidden' };
@@ -39,7 +38,7 @@ const Overlay = () => {
             unlisten.then(f => f());
         };
     }, []);
-    useEffect(() => {
+    React.useEffect(() => {
         const keydownListener = () => {
             setState({ type: 'Hidden' });
         };
@@ -48,7 +47,7 @@ const Overlay = () => {
             document.removeEventListener('keydown', keydownListener);
         };
     }, []);
-    useEffect(() => {
+    React.useEffect(() => {
         const mousedownListener = () => {
             setState({ type: 'Hidden' });
         };
@@ -57,7 +56,7 @@ const Overlay = () => {
             document.removeEventListener('mousedown', mousedownListener);
         };
     }, []);
-    useEffect(() => {
+    React.useEffect(() => {
         const unlisten = window.getCurrent().listen<State>('update', event => {
             setState(event.payload);
         });
@@ -66,7 +65,7 @@ const Overlay = () => {
             unlisten.then(f => f());
         };
     }, []);
-    useEffect(() => {
+    React.useEffect(() => {
         (async () => {
             if (state.type === 'Hidden') {
                 setTimeout(async () => {
@@ -76,7 +75,7 @@ const Overlay = () => {
             }
 
             let currentWindow = window.getCurrent();
-            let [monitorWidth, monitorHeight] = await tauri.invoke<[number, number]>('get_monitor_size');
+            let [monitorWidth, monitorHeight] = await invoke<[number, number]>('get_monitor_size');
             currentWindow.setSize(new window.PhysicalSize(monitorWidth, monitorHeight));
 
             const canvas = canvasRef.current!;

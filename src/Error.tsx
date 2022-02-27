@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
-import { AppBar, Box, Button, Toolbar, Typography } from '@mui/material'
+import React from 'react';
 import { invoke, window } from '@tauri-apps/api';
+import { AppBar, Box, Button, Toolbar, Typography } from '@mui/material'
 import { SentimentVeryDissatisfied } from '@mui/icons-material';
 
 const Error = () => {
-    const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
-    useEffect(() => {
+    const [errorMessage, setErrorMessage] = React.useState<string | undefined>(undefined);
+    React.useEffect(() => {
         const keydownListener = (event: KeyboardEvent) => {
             event.preventDefault();
         };
@@ -14,10 +14,10 @@ const Error = () => {
             document.removeEventListener('keydown', keydownListener);
         };
     }, []);
-    useEffect(() => {
+    React.useEffect(() => {
         invoke<string>('get_error_message').then(setErrorMessage).catch(console.error);
     }, []);
-    useEffect(() => {
+    React.useEffect(() => {
         window.getCurrent().show();
     }, [errorMessage]);
     return (
@@ -25,7 +25,7 @@ const Error = () => {
             <AppBar position='fixed' sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
                 <Toolbar data-tauri-drag-region='true'>
                     <Typography variant='h6' component='div' color='inherit'>
-                        ArchBro error
+                        Archbroski error
                     </Typography>
                 </Toolbar>
             </AppBar>

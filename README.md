@@ -35,4 +35,4 @@ Then, ingame, whenever you approach an archnemesis statue, click its icon and pr
 
  ## 4. Having issues?
 
- Don't be shy, just open a bug report on [here](https://github.com/moxaj/archbroski/issues). Also, if you are a seasoned rust or react dev, feel free to provide any feedback regarding the implementation.
+ Don't be shy, just open a bug report [here](https://github.com/moxaj/archbroski/issues). Also, if you are a seasoned rust or react dev, feel free to provide any feedback regarding the implementation.

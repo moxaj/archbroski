@@ -1,27 +1,17 @@
-import { Add, AddCircle, Delete } from '@mui/icons-material';
-import { Box, Divider, FormControl, IconButton, InputLabel, MenuItem, Select, TextField, Typography } from '@mui/material';
+import React from 'react';
 import { invoke } from '@tauri-apps/api';
-import { Dispatch, SetStateAction, useEffect, useState } from 'react';
-import { UserSettings } from './Settings';
-
-type Modifier = {
-    id: number,
-    name: string,
-    recipe: number[],
-};
-
-type Modifiers = {
-    byId: { [key: number]: Modifier },
-    components: { [key: number]: { [key: number]: number } }
-};
+import { Add, Delete } from '@mui/icons-material';
+import { Box, Divider, FormControl, IconButton, InputLabel, MenuItem, Select, Typography } from '@mui/material';
+import WithLoading from './WithLoading';
+import { UserSettings, Modifiers } from './Settings';
 
 type CombosPageProps = {
     userSettings: UserSettings;
-    setUserSettings: Dispatch<SetStateAction<UserSettings | undefined>>;
+    setUserSettings: React.Dispatch<React.SetStateAction<UserSettings | undefined>>;
+    modifiers: Modifiers;
 };
 
-const CombosPage = ({ userSettings, setUserSettings }: CombosPageProps) => {
-    const [modifiers, setModifiers] = useState<Modifiers | undefined>(undefined);
+const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProps) => {
     const setCombos = (combos: number[][]) => {
         setUserSettings(userSettings => ({
             ...userSettings!,
@@ -76,54 +66,49 @@ const CombosPage = ({ userSettings, setUserSettings }: CombosPageProps) => {
             return modifierName1.localeCompare(modifierName2);
         });
     }
-    useEffect(() => {
-        invoke<Modifiers>('get_modifiers').then(setModifiers);
-    }, []);
-    return modifiers === undefined
-        ? (
-            <div>
-                asdf
-            </div>
-        )
-        : <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ width: 1, height: '70%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                {userSettings.combos.map((combo, comboIndex) => (
-                    <Box key={comboIndex} sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                        <IconButton sx={{ visibility: 'hidden' }}>
-                            <Delete />
+    return (
+        <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
+            <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
+                <Box sx={{ width: 1, height: '70%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    {userSettings.combos.map((combo, comboIndex) => (
+                        <Box key={comboIndex} sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                            <IconButton sx={{ visibility: 'hidden' }}>
+                                <Delete />
+                            </IconButton>
+                            {combo.map((modifierId, modifierIdIndex) => (
+                                <FormControl key={modifierIdIndex} sx={{ width: 170, m: 1 }}>
+                                    <InputLabel>{`Modifier ${modifierIdIndex + 1}`}</InputLabel>
+                                    <Select
+                                        value={modifierId}
+                                        label={`Modifier ${modifierIdIndex + 1}`}>
+                                        {modifiers && sortedModifierIds(modifiers).map((modifierId, modifierIndex) => (
+                                            <MenuItem key={modifierIndex} value={modifierId}>
+                                                <Typography variant='body2'>
+                                                    {modifiers.byId[+modifierId].name}
+                                                </Typography>
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            ))}
+                            <IconButton onClick={() => { removeCombo(comboIndex); }}>
+                                <Delete />
+                            </IconButton>
+                        </Box>
+                    ))}
+                    {userSettings.combos.length < 10 && (
+                        <IconButton>
+                            <Add />
                         </IconButton>
-                        {combo.map((modifierId, modifierIdIndex) => (
-                            <FormControl key={modifierIdIndex} sx={{ width: 170, m: 1 }}>
-                                <InputLabel>{`Modifier ${modifierIdIndex + 1}`}</InputLabel>
-                                <Select
-                                    value={modifierId}
-                                    label={`Modifier ${modifierIdIndex + 1}`}>
-                                    {modifiers && sortedModifierIds(modifiers).map((modifierId, modifierIndex) => (
-                                        <MenuItem key={modifierIndex} value={modifierId}>
-                                            <Typography variant='body2'>
-                                                {modifiers.byId[+modifierId].name}
-                                            </Typography>
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        ))}
-                        <IconButton onClick={() => { removeCombo(comboIndex); }}>
-                            <Delete />
-                        </IconButton>
-                    </Box>
-                ))}
-                {userSettings.combos.length < 10 && (
-                    <IconButton>
-                        <Add />
-                    </IconButton>
-                )}
-            </Box>
-            <Divider />
-            <Box>
+                    )}
+                </Box>
+                <Divider />
+                <Box>
 
+                </Box>
             </Box>
-        </Box>
+        </WithLoading>
+    );
 };
 
 export default CombosPage;

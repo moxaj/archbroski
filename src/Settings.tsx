@@ -1,12 +1,23 @@
+import React from 'react';
+import { window, invoke } from '@tauri-apps/api';
 import { AppBar, Box, IconButton, Toolbar, Typography, CircularProgress, Tab, Tabs } from '@mui/material';
 import { Minimize } from '@mui/icons-material';
-import { invoke, window } from '@tauri-apps/api';
-import { useEffect, useState } from 'react';
-import { Set } from 'typescript';
 import { TabContext, TabPanel } from '@mui/lab';
 import GeneralPage from './GeneralPage';
 import CombosPage from './CombosPage';
 import AboutPage from './AboutPage';
+import WithLoading from './WithLoading';
+
+export type Modifier = {
+    id: number,
+    name: string,
+    recipe: number[],
+};
+
+export type Modifiers = {
+    byId: { [key: number]: Modifier },
+    components: { [key: number]: { [key: number]: number } }
+};
 
 export type RewardType = 'Generic'
     | 'Armour'
@@ -45,17 +56,24 @@ export type UserSettings = {
 };
 
 const Settings = () => {
-    const [userSettings, setUserSettings] = useState<UserSettings | undefined>(undefined);
-    const [tab, setTab] = useState('general');
-    useEffect(() => {
-        window.getCurrent().show();
-        Promise.all([
-            invoke<UserSettings>('get_user_settings'),
-            new Promise(resolve => setTimeout(resolve, 500))
-        ]).then(([userSettings]) => setUserSettings(userSettings)).catch(console.error);
+    const [userSettings, setUserSettings] = React.useState<UserSettings | undefined>(undefined);
+    const [modifiers, setModifiers] = React.useState<Modifiers | undefined>(undefined);
+    const [tab, setTab] = React.useState('general');
+    React.useEffect(() => {
+        Promise
+            .all([
+                invoke<UserSettings>('get_user_settings'),
+                invoke<Modifiers>('get_modifiers')
+            ])
+            .then(([userSettings, modifiers]) => {
+                setUserSettings(userSettings);
+                setModifiers(modifiers);
+                window.getCurrent().show();
+            })
+            .catch(console.error);
     }, []);
     return (
-        <Box sx={{ width: 1, height: 1, display: 'flex' }}>
+        <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
             <AppBar position='fixed' sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
                 <Toolbar data-tauri-drag-region='true'>
                     <Typography variant='h6' component='div' color='inherit'>
@@ -67,42 +85,35 @@ const Settings = () => {
                     </IconButton>
                 </Toolbar>
             </AppBar>
-            {userSettings === undefined && (
-                <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
-                    <Toolbar />
-                    <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                        <CircularProgress />
+            <Toolbar />
+            <TabContext value={tab}>
+                <WithLoading loaded={modifiers !== undefined} sx={{ width: 1, height: 1 }}>
+                    <Box sx={{ width: 1, height: 1, display: 'flex' }}>
+                        <Box sx={{ width: 150, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+                            <Tabs
+                                orientation='vertical'
+                                value={tab}
+                                onChange={(_, value) => { setTab(value) }}
+                                sx={{ height: 1, borderRight: 1, borderColor: 'divider' }}>
+                                <Tab label='General' value={'general'} />
+                                <Tab label='Combos' value={'combos'} />
+                                <Tab label='About' value={'about'} />
+                            </Tabs>
+                        </Box>
+                        <Box sx={{ flexGrow: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
+                            <TabPanel value={'general'} sx={{ width: 1, height: 1 }}>
+                                <GeneralPage userSettings={userSettings!} setUserSettings={setUserSettings} />
+                            </TabPanel>
+                            <TabPanel value={'combos'} sx={{ width: 1, height: 1 }}>
+                                <CombosPage userSettings={userSettings!} setUserSettings={setUserSettings} modifiers={modifiers!} />
+                            </TabPanel>
+                            <TabPanel value={'about'} sx={{ width: 1, height: 1 }}>
+                                <AboutPage />
+                            </TabPanel>
+                        </Box>
                     </Box>
-                </Box>
-            )}
-            {userSettings !== undefined && (
-                <TabContext value={tab}>
-                    <Box sx={{ width: 150, display: 'flex', flexDirection: 'column' }}>
-                        <Toolbar />
-                        <Tabs
-                            orientation='vertical'
-                            value={tab}
-                            onChange={(_, value) => { setTab(value) }}
-                            sx={{ height: 1, borderRight: 1, borderColor: 'divider' }}>
-                            <Tab label='General' value={'general'} />
-                            <Tab label='Combos' value={'combos'} />
-                            <Tab label='About' value={'about'} />
-                        </Tabs>
-                    </Box>
-                    <Box sx={{ flexGrow: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
-                        <Toolbar />
-                        <TabPanel value={'general'} sx={{ width: 1, height: 1 }}>
-                            <GeneralPage userSettings={userSettings} setUserSettings={setUserSettings} />
-                        </TabPanel>
-                        <TabPanel value={'combos'} sx={{ width: 1, height: 1 }}>
-                            <CombosPage userSettings={userSettings} setUserSettings={setUserSettings} />
-                        </TabPanel>
-                        <TabPanel value={'about'} sx={{ width: 1, height: 1 }}>
-                            <AboutPage />
-                        </TabPanel>
-                    </Box>
-                </TabContext>
-            )}
+                </WithLoading>
+            </TabContext>
         </Box>
     );
 }
