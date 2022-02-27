@@ -18,7 +18,9 @@
       "icon": [
         "icons/icon.ico"
       ],
-      "resources": [],
+      "resources": [
+        "src/resources/opencv_world455.dll"
+      ],
       "externalBin": [],
       "copyright": "",
       "category": "DeveloperTool",
