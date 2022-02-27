@@ -8,31 +8,26 @@ Install the program using the [installer](https://www.google.com).
 
 ## 2. Configuration
 
-After running the program, right click on the system tray icon and click `Settings`.
-
-Here you can find:
- - your combos
- - the activation hotkey
- - the calculation mode
- - the relative reward type weights, if using `Smart` mode
+After running the program, right click on the system tray icon and click `Settings`. Here you can set your
+activation hotkey and your combos.
 
 ## 3. Usage
 
-First, make sure you are running Path of Exile in windowed or borderless mode and that you ran __archbroski__ on the same monitor as Path of Exile.
+First, make sure you are running Path of Exile in __windowed or borderless mode__ and that you ran __archbroski__ on the same monitor as Path of Exile.
 
-Then, ingame, whenever you approach an archnemesis statue, click its icon and press your activation hotkey. When you do this, make sure that:
+Then, ingame, whenever you approach an archnemesis statue, click its icon and press your activation hotkey.
 
- - your stash and its left side are fully visible
- - the queue and its top side are fully visible
+> __Important__: your stash, queue, and their immediate surroundings (~ 50 pixels around) should be __fully visible and unobstructed__ by anything (including your cursor!).
 
- I suggest you move your mouse to the bottom of your screen so that it doesn't interfere with the image recognition.
-
- Once activated, the image recognition algorithm will parse your stash and queue. This may take a few seconds, but every time-consuming action is cached, so subsequent activations should be reasonably fast (< 100ms on my system).
+Once activated, the image recognition algorithm will parse your stash and queue. This may take a few seconds, but every time-consuming action is cached, so subsequent activations should be reasonably fast (< 100ms on my system).
  
- If all goes well, you'll see a single modifier highlighted and a green checkmark at the bottom of your screen. A red exclamation point indicates that the image recognition failed, and a red question mark indicates that for some reason, the logical component couldn't select a modifier to use.
+If all goes well, you'll see a single modifier highlighted and a green checkmark at the bottom of your screen. A red exclamation point indicates that the image recognition failed, and a red question mark indicates that for some reason, the logical component couldn't select a modifier to use.
  
- Whatever the result was, you can hide the overlay with any key or mouse button press.
+Whatever the result was, you can hide the overlay with any key or mouse button press.
 
- ## 4. Having issues?
+> __Important:__ if, for any reason, your UI differs in size, or you use anything akin to Reshade, SweetFX, NVIDIA Freestyle, etc.,
+the image recognition is __very likely to fail__ (fail to recognize the layout or misidentify the modifiers).
 
- Don't be shy, just open a bug report [here](https://github.com/moxaj/archbroski/issues). Also, if you are a seasoned rust or react dev, feel free to provide any feedback regarding the implementation.
+## 4. Having issues?
+
+Don't be shy, just open a bug report [here](https://github.com/moxaj/archbroski/issues). Also, if you are a seasoned rust or react dev, feel free to provide any feedback regarding the implementation.
