@@ -22,6 +22,7 @@ export type Modifiers = {
 export type LabeledCombo = {
     id: number,
     label: string,
+    enabled: boolean;
     combo: number[];
 }
 

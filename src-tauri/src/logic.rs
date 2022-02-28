@@ -173,12 +173,18 @@ pub type Hotkey = String;
 pub struct LabeledCombo {
     pub id: u64,
     pub label: String,
+    pub enabled: bool,
     pub combo: Vec<ModifierId>,
 }
 
 impl LabeledCombo {
-    pub fn new(id: u64, label: String, combo: Vec<ModifierId>) -> Self {
-        Self { id, label, combo }
+    pub fn new(id: u64, label: String, enabled: bool, combo: Vec<ModifierId>) -> Self {
+        Self {
+            id,
+            label,
+            enabled,
+            combo,
+        }
     }
 }
 
@@ -194,8 +200,12 @@ pub struct UserSettings {
 impl DiscSynchronized for UserSettings {
     fn new() -> Self {
         Self {
-            labeled_combos: collection![],
-            forbidden_modifier_ids: collection![],
+            labeled_combos: vec![
+                LabeledCombo::new(0, "All the uniques".to_owned(), true, vec![38, 60, 57, 58]),
+                LabeledCombo::new(1, "I love expedition".to_owned(), true, vec![37, 38, 31, 4]),
+                LabeledCombo::new(2, "$$$".to_owned(), true, vec![61, 62, 57, 59]),
+            ],
+            forbidden_modifier_ids: collection![52, 56],
             hotkey: "ctrl + d".to_owned(),
         }
     }
@@ -220,7 +230,9 @@ impl UserSettings {
         let used_modifier_ids = self
             .labeled_combos
             .iter()
-            .map(|LabeledCombo { combo, .. }| combo)
+            .filter_map(
+                |LabeledCombo { combo, enabled, .. }| if *enabled { Some(combo) } else { None },
+            )
             .flat_map(|combo| {
                 combo.iter().flat_map(|modifier_id| {
                     MODIFIERS.components[modifier_id]
@@ -380,7 +392,9 @@ pub fn suggest_modifier_id(
         user_settings
             .labeled_combos
             .iter()
-            .map(|LabeledCombo { combo, .. }| combo)
+            .filter_map(
+                |LabeledCombo { combo, enabled, .. }| if *enabled { Some(combo) } else { None },
+            )
             .find(|&combo| {
                 (0..queue.len()).all(|index| queue[index] == combo[index])
                     && combo
@@ -394,7 +408,15 @@ pub fn suggest_modifier_id(
                 let mut modifier_ids = user_settings
                     .labeled_combos
                     .iter()
-                    .map(|LabeledCombo { combo, .. }| combo)
+                    .filter_map(
+                        |LabeledCombo { combo, enabled, .. }| {
+                            if *enabled {
+                                Some(combo)
+                            } else {
+                                None
+                            }
+                        },
+                    )
                     .flat_map(|combo| {
                         combo
                             .iter()

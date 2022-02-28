@@ -4,7 +4,7 @@ import { Add, Delete, Error, Help, Lock } from '@mui/icons-material';
 import { TransitionProps } from '@mui/material/transitions';
 import {
     Box, Chip, Collapse, Dialog, DialogContent, DialogContentText, DialogTitle, Divider,
-    Fade, FormControl, Grow, IconButton, MenuItem, Select, TextField, Tooltip, Typography, Zoom
+    Fade, FormControl, Grow, IconButton, MenuItem, Select, Switch, TextField, Tooltip, Typography, Zoom
 } from '@mui/material';
 import WithLoading from './WithLoading';
 import { UserSettings, Modifiers } from './Settings';
@@ -37,26 +37,10 @@ const HelpDialog = ({ open, onClose }: { open: boolean, onClose: () => void }) =
             </DialogTitle>
             <DialogContent>
                 <DialogContentText>
-                    <Typography sx={{ mb: 1 }}>
-                        Here you can define up to 4 combos you consider your <i>goals</i>. The top one has the highest priority,
-                        the bottom one has the lowest. Unused modifiers may be locked / unlocked by clicking on them; locked
-                        modifiers will <b>not</b> be suggested under any circumstances, while unlocked modifiers can be used
-                        to free up some space or as fillers.
-                    </Typography>
-                    <Typography>
-                        One such combo could be
-                    </Typography>
-                    <Typography variant='caption'>
-                        <code>Innocence-Touched + Brine King-touched + Kitava-touched + Treant Horde</code><br />
-                    </Typography>
-                    <Typography>
-                        which yields a huge amount of currency items.
-                    </Typography>
-                    <Divider sx={{ my: 1 }} />
-                    <Typography>
-                        <b>archbroski</b> does not (yet) provide any convenient way to discover these - look
-                        for them on the Path of Exile subreddit!
-                    </Typography>
+                    Here you can define up to 4 combos you consider your <i>goals</i>. The top one has the highest priority,
+                    the bottom one has the lowest. Unused modifiers may be locked / unlocked by clicking on them; locked
+                    modifiers will <b>not</b> be suggested under any circumstances, while unlocked modifiers can be used
+                    to free up some space or as fillers.
                 </DialogContentText>
             </DialogContent>
         </Dialog>
@@ -75,7 +59,7 @@ const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProp
     const unusedModifierIds = React.useMemo(() => {
         const getUsedModifierIds = (modifierId: number): number[] =>
             [modifierId, ...modifiers.byId[modifierId].recipe.flatMap(getUsedModifierIds)];
-        let usedModifierIds = new Set(userSettings.labeledCombos.flatMap(({ combo }) => combo.flatMap(getUsedModifierIds)));
+        let usedModifierIds = new Set(userSettings.labeledCombos.flatMap(({ enabled, combo }) => !enabled ? [] : combo.flatMap(getUsedModifierIds)));
         let unusedModifierIds = numberKeys(modifiers.byId)
             .filter(modifierId => !usedModifierIds.has(modifierId))
             .map(modifierId => modifiers.byId[modifierId])
@@ -95,8 +79,9 @@ const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProp
                     ...userSettings!.labeledCombos,
                     {
                         id: 1 + Math.max(0, ...userSettings!.labeledCombos.map(({ id }) => id)),
-                        label: 'New combo',
-                        combo: [0, 0, 0, 0]
+                        label: '',
+                        combo: [4, 5, 7, 2],
+                        enabled: true
                     }
                 ]
             };
@@ -114,9 +99,10 @@ const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProp
         setUserSettings(userSettings => {
             return {
                 ...userSettings!,
-                labeledCombos: userSettings!.labeledCombos.map(({ id, label, combo }) => ({
+                labeledCombos: userSettings!.labeledCombos.map(({ id, label, enabled, combo }) => ({
                     id,
                     label: id !== comboId ? label : newLabel,
+                    enabled,
                     combo
                 }))
             };
@@ -126,9 +112,10 @@ const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProp
         setUserSettings(userSettings => {
             return {
                 ...userSettings!,
-                labeledCombos: userSettings!.labeledCombos.map(({ id, label, combo }) => ({
+                labeledCombos: userSettings!.labeledCombos.map(({ id, label, enabled, combo }) => ({
                     id,
                     label,
+                    enabled,
                     combo: id !== comboId ? combo : combo.map((modifierId_, modifierIdIndex_) =>
                         modifierIdIndex_ === modifierIdIndex ? modifierId : modifierId_)
                 }))
@@ -146,6 +133,19 @@ const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProp
             }
         });
     };
+    const toggleComboEnabled = (comboId: number, newEnabled: boolean) => {
+        setUserSettings(userSettings => {
+            return {
+                ...userSettings!,
+                labeledCombos: userSettings!.labeledCombos.map(({ id, label, enabled, combo }) => ({
+                    id,
+                    label,
+                    enabled: id !== comboId ? enabled : newEnabled,
+                    combo
+                }))
+            };
+        });
+    }
     return (
         <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
             <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -155,17 +155,20 @@ const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProp
                 <HelpDialog open={helpVisible} onClose={() => { setHelpVisible(false) }} />
                 <Box sx={{ width: 1, height: 380, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', overflow: 'auto' }}>
                     <TransitionGroup>
-                        {userSettings.labeledCombos.map(({ id: comboId, label, combo }) => (
+                        {userSettings.labeledCombos.map(({ id: comboId, label, enabled, combo }) => (
                             <Collapse key={comboId}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', my: 1 }}>
+                                    <Switch checked={enabled} onChange={(event) => { toggleComboEnabled(comboId, event.target.checked); }} />
                                     <TextField
                                         variant='outlined'
                                         label='Label'
-                                        sx={{ mx: 1 }}
+                                        spellCheck={false}
+                                        sx={{ width: 150, mx: 1 }}
+                                        disabled={!enabled}
                                         defaultValue={label}
-                                        onBlur={(event) => { setLabel(comboId, event.target.value) }}/>
+                                        onBlur={(event) => { setLabel(comboId, event.target.value) }} />
                                     {combo.map((modifierId, modifierIdIndex) => (
-                                        <FormControl key={modifierIdIndex} sx={{ width: 180, mx: 0.3, my: 0.2 }}>
+                                        <FormControl key={modifierIdIndex} disabled={!enabled} sx={{ width: 180, mx: 0.3, my: 0.2 }}>
                                             <Select value={modifierId}>
                                                 {modifiers && sortedModifierIds.map((modifierId_, modifierIdIndex_) => (
                                                     <MenuItem key={modifierIdIndex_} value={modifierId_}
@@ -178,7 +181,7 @@ const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProp
                                             </Select>
                                         </FormControl>
                                     ))}
-                                    <IconButton disabled={userSettings.labeledCombos.length === 1} onClick={() => { removeCombo(comboId); }}>
+                                    <IconButton disabled={userSettings.labeledCombos.length === 1 || !enabled} onClick={() => { removeCombo(comboId); }}>
                                         <Delete />
                                     </IconButton>
                                     <Tooltip
