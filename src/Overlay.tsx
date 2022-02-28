@@ -34,9 +34,7 @@ const Overlay = () => {
                 return state_.type === 'Hidden' ? state_ : { type: 'Hidden' };
             });
         });
-        return () => {
-            unlisten.then(f => f());
-        };
+        return () => { unlisten.then(f => f()); };
     }, []);
     React.useEffect(() => {
         const keydownListener = () => {
@@ -61,9 +59,7 @@ const Overlay = () => {
             setState(event.payload);
         });
 
-        return () => {
-            unlisten.then(f => f());
-        };
+        return () => { unlisten.then(f => f()); };
     }, []);
     React.useEffect(() => {
         (async () => {

@@ -94,7 +94,7 @@ fn create_settings_window(app: &tauri::AppHandle) {
             (
                 window_builder
                     .title("Archbroski")
-                    .inner_size(1200f64, 700f64)
+                    .inner_size(1300f64, 700f64)
                     .decorations(false)
                     .resizable(false)
                     .visible(false)
@@ -445,7 +445,10 @@ fn main() {
             if let tauri::SystemTrayEvent::MenuItemClick { id, .. } = event {
                 match id.as_str() {
                     "settings" => show_settings_window(app),
-                    "quit" => app.exit(0),
+                    "quit" => {
+                        let app = app.clone();
+                        std::thread::spawn(move || app.exit(0));
+                    }
                     _ => {}
                 }
             }

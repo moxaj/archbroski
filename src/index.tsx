@@ -7,6 +7,10 @@ import Overlay from './Overlay';
 import Error from './Error';
 import './index.scss';
 
+export function numberKeys<T>(map: { [key: number]: T }) {
+  return Object.keys(map).map(item => +item);
+};
+
 const windowLabel = window.getCurrent().label;
 ReactDOM.render(
   <React.StrictMode>

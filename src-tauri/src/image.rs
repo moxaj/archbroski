@@ -272,7 +272,7 @@ impl DiscSynchronized for SerializableCache {
     }
 
     fn file_name() -> &'static str {
-        ".cache"
+        "archbroski\\.cache"
     }
 
     fn save_impl(&self, writer: &mut BufWriter<File>) -> Result<(), Box<dyn Error>> {

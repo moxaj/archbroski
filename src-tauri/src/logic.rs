@@ -168,11 +168,25 @@ pub static MODIFIERS: Lazy<Modifiers> = Lazy::new(Modifiers::new);
 /// A hotkey.
 pub type Hotkey = String;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LabeledCombo {
+    pub id: u64,
+    pub label: String,
+    pub combo: Vec<ModifierId>,
+}
+
+impl LabeledCombo {
+    pub fn new(id: u64, label: String, combo: Vec<ModifierId>) -> Self {
+        Self { id, label, combo }
+    }
+}
+
 /// All settings for the user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserSettings {
-    pub combos: Vec<(u64, Vec<ModifierId>)>,
+    pub labeled_combos: Vec<LabeledCombo>,
     pub forbidden_modifier_ids: HashSet<ModifierId>,
     pub hotkey: String,
 }
@@ -180,7 +194,7 @@ pub struct UserSettings {
 impl DiscSynchronized for UserSettings {
     fn new() -> Self {
         Self {
-            combos: collection![],
+            labeled_combos: collection![],
             forbidden_modifier_ids: collection![],
             hotkey: "ctrl + d".to_owned(),
         }
@@ -204,9 +218,9 @@ impl JsonDiscSynchronized for UserSettings {}
 impl UserSettings {
     pub fn get_filler_modifier_ids(&self) -> HashSet<ModifierId> {
         let used_modifier_ids = self
-            .combos
+            .labeled_combos
             .iter()
-            .map(|(_, combo)| combo)
+            .map(|LabeledCombo { combo, .. }| combo)
             .flat_map(|combo| {
                 combo.iter().flat_map(|modifier_id| {
                     MODIFIERS.components[modifier_id]
@@ -364,9 +378,9 @@ pub fn suggest_modifier_id(
     memoized!((&stash, &queue), CACHE, {
         let time_before = Instant::now();
         user_settings
-            .combos
+            .labeled_combos
             .iter()
-            .map(|(_, combo)| combo)
+            .map(|LabeledCombo { combo, .. }| combo)
             .find(|&combo| {
                 (0..queue.len()).all(|index| queue[index] == combo[index])
                     && combo
@@ -378,9 +392,9 @@ pub fn suggest_modifier_id(
             .or_else(|| {
                 let filler_modifiers_ids = user_settings.get_filler_modifier_ids();
                 let mut modifier_ids = user_settings
-                    .combos
+                    .labeled_combos
                     .iter()
-                    .map(|(_, combo)| combo)
+                    .map(|LabeledCombo { combo, .. }| combo)
                     .flat_map(|combo| {
                         combo
                             .iter()

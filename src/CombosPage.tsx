@@ -4,11 +4,11 @@ import { Add, Delete, Error, Help, Lock } from '@mui/icons-material';
 import { TransitionProps } from '@mui/material/transitions';
 import {
     Box, Chip, Collapse, Dialog, DialogContent, DialogContentText, DialogTitle, Divider,
-    Fade, FormControl, Grow, IconButton, MenuItem, Select, Tooltip, Typography, Zoom
+    Fade, FormControl, Grow, IconButton, MenuItem, Select, TextField, Tooltip, Typography, Zoom
 } from '@mui/material';
 import WithLoading from './WithLoading';
 import { UserSettings, Modifiers } from './Settings';
-
+import { numberKeys } from '.';
 
 type CombosPageProps = {
     userSettings: UserSettings;
@@ -16,7 +16,7 @@ type CombosPageProps = {
     modifiers: Modifiers;
 };
 
-const Transition = React.forwardRef((
+const HelpDialogTransition = React.forwardRef((
     props: TransitionProps & {
         children: React.ReactElement<any, any>;
     },
@@ -28,7 +28,7 @@ const Transition = React.forwardRef((
 const HelpDialog = ({ open, onClose }: { open: boolean, onClose: () => void }) => {
     return (
         <Dialog
-            TransitionComponent={Transition}
+            TransitionComponent={HelpDialogTransition}
             keepMounted
             open={open}
             onClose={onClose}>
@@ -41,7 +41,7 @@ const HelpDialog = ({ open, onClose }: { open: boolean, onClose: () => void }) =
                         Here you can define up to 4 combos you consider your <i>goals</i>. The top one has the highest priority,
                         the bottom one has the lowest. Unused modifiers may be locked / unlocked by clicking on them; locked
                         modifiers will <b>not</b> be suggested under any circumstances, while unlocked modifiers can be used
-                        to free up some space or as 'fillers'.
+                        to free up some space or as fillers.
                     </Typography>
                     <Typography>
                         One such combo could be
@@ -66,39 +66,38 @@ const HelpDialog = ({ open, onClose }: { open: boolean, onClose: () => void }) =
 const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProps) => {
     const [helpVisible, setHelpVisible] = React.useState(false);
     const sortedModifierIds = React.useMemo(() => {
-        return Object.keys(modifiers.byId).sort((modifierId1, modifierId2) => {
-            const modifierName1 = modifiers!.byId[+modifierId1].name;
-            const modifierName2 = modifiers!.byId[+modifierId2].name;
+        return numberKeys(modifiers.byId).sort((modifierId1, modifierId2) => {
+            const modifierName1 = modifiers.byId[modifierId1].name;
+            const modifierName2 = modifiers.byId[modifierId2].name;
             return modifierName1.localeCompare(modifierName2);
         });
     }, [modifiers]);
     const unusedModifierIds = React.useMemo(() => {
-        const getUsedModifierIds = (modifierId: number): number[] => {
-            const modifier = modifiers.byId[modifierId];
-            return [modifierId, ...modifier.recipe.flatMap(getUsedModifierIds)];
-        };
-        let usedModifierIds = new Set(userSettings.combos.flatMap(([_, combo]) => combo.flatMap(getUsedModifierIds)));
-        let unusedModifierIds = Object.keys(modifiers.byId)
-            .filter(modifierId => !usedModifierIds.has(+modifierId))
-            .map(modifierId => modifiers.byId[+modifierId])
+        const getUsedModifierIds = (modifierId: number): number[] =>
+            [modifierId, ...modifiers.byId[modifierId].recipe.flatMap(getUsedModifierIds)];
+        let usedModifierIds = new Set(userSettings.labeledCombos.flatMap(({ combo }) => combo.flatMap(getUsedModifierIds)));
+        let unusedModifierIds = numberKeys(modifiers.byId)
+            .filter(modifierId => !usedModifierIds.has(modifierId))
+            .map(modifierId => modifiers.byId[modifierId])
             .sort((modifier1, modifier2) => modifier1.name.localeCompare(modifier2.name))
             .map(modifier => modifier.id);
         return unusedModifierIds;
-    }, [userSettings]);
+    }, [modifiers, userSettings]);
     const isComboValid = (userSettings: UserSettings, comboId: number) => {
-        const [_, combo] = userSettings.combos.find(([comboId_, _]) => comboId_ === comboId)!;
+        const { combo } = userSettings.labeledCombos.find(({ id }) => id === comboId)!;
         return new Set(combo).size === combo.length;
     };
     const addCombo = () => {
         setUserSettings(userSettings => {
             return {
                 ...userSettings!,
-                combos: [
-                    ...userSettings!.combos,
-                    [
-                        1 + Math.max(0, ...userSettings!.combos.map(([comboId, _]) => comboId)),
-                        [1, 2, 3, 4]
-                    ]
+                labeledCombos: [
+                    ...userSettings!.labeledCombos,
+                    {
+                        id: 1 + Math.max(0, ...userSettings!.labeledCombos.map(({ id }) => id)),
+                        label: 'New combo',
+                        combo: [0, 0, 0, 0]
+                    }
                 ]
             };
         });
@@ -107,7 +106,19 @@ const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProp
         setUserSettings(userSettings => {
             return {
                 ...userSettings!,
-                combos: userSettings!.combos.filter(([comboId_, _]) => comboId_ !== comboId)
+                labeledCombos: userSettings!.labeledCombos.filter(({ id }) => id !== comboId)
+            };
+        });
+    };
+    const setLabel = (comboId: number, newLabel: string) => {
+        setUserSettings(userSettings => {
+            return {
+                ...userSettings!,
+                labeledCombos: userSettings!.labeledCombos.map(({ id, label, combo }) => ({
+                    id,
+                    label: id !== comboId ? label : newLabel,
+                    combo
+                }))
             };
         });
     };
@@ -115,14 +126,12 @@ const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProp
         setUserSettings(userSettings => {
             return {
                 ...userSettings!,
-                combos: userSettings!.combos.map(([comboId_, combo]) => {
-                    if (comboId_ !== comboId) {
-                        return [comboId_, combo];
-                    } else {
-                        return [comboId_, combo.map((modifierId_, modifierIdIndex_) =>
-                            modifierIdIndex_ === modifierIdIndex ? modifierId : modifierId_)]
-                    }
-                })
+                labeledCombos: userSettings!.labeledCombos.map(({ id, label, combo }) => ({
+                    id,
+                    label,
+                    combo: id !== comboId ? combo : combo.map((modifierId_, modifierIdIndex_) =>
+                        modifierIdIndex_ === modifierIdIndex ? modifierId : modifierId_)
+                }))
             };
         });
     };
@@ -139,24 +148,24 @@ const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProp
     };
     return (
         <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
-            <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <IconButton size='large' sx={{ position: 'absolute', right: 0, top: 0 }} onClick={() => { setHelpVisible(true) }}>
                     <Help />
                 </IconButton>
                 <HelpDialog open={helpVisible} onClose={() => { setHelpVisible(false) }} />
-                <Box sx={{ width: 1, flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <Box sx={{ width: 1, height: 380, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', overflow: 'auto' }}>
                     <TransitionGroup>
-                        {userSettings.combos.map(([comboId, combo]) => (
+                        {userSettings.labeledCombos.map(({ id: comboId, label, combo }) => (
                             <Collapse key={comboId}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                    <Tooltip sx={{ visibility: 'hidden' }} title=''>
-                                        <Error />
-                                    </Tooltip>
-                                    <IconButton sx={{ visibility: 'hidden' }}>
-                                        <Delete />
-                                    </IconButton>
+                                <Box sx={{ display: 'flex', alignItems: 'center', my: 1 }}>
+                                    <TextField
+                                        variant='outlined'
+                                        label='Label'
+                                        sx={{ mx: 1 }}
+                                        defaultValue={label}
+                                        onBlur={(event) => { setLabel(comboId, event.target.value) }}/>
                                     {combo.map((modifierId, modifierIdIndex) => (
-                                        <FormControl key={modifierIdIndex} sx={{ width: 180, m: 0.5 }}>
+                                        <FormControl key={modifierIdIndex} sx={{ width: 180, mx: 0.3, my: 0.2 }}>
                                             <Select value={modifierId}>
                                                 {modifiers && sortedModifierIds.map((modifierId_, modifierIdIndex_) => (
                                                     <MenuItem key={modifierIdIndex_} value={modifierId_}
@@ -169,7 +178,7 @@ const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProp
                                             </Select>
                                         </FormControl>
                                     ))}
-                                    <IconButton disabled={userSettings.combos.length === 1} onClick={() => { removeCombo(comboId); }}>
+                                    <IconButton disabled={userSettings.labeledCombos.length === 1} onClick={() => { removeCombo(comboId); }}>
                                         <Delete />
                                     </IconButton>
                                     <Tooltip
@@ -188,14 +197,14 @@ const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProp
                             </Collapse>
                         ))}
                     </TransitionGroup>
-                    <Fade in={userSettings.combos.length < 4}>
+                    <Fade in={userSettings.labeledCombos.length < 10}>
                         <IconButton onClick={() => { addCombo(); }}>
                             <Add />
                         </IconButton>
                     </Fade>
                 </Box>
                 <Divider />
-                <Box sx={{ width: 1, height: 250, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <Box sx={{ width: 1, flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <Typography variant='body2' sx={{ m: 1, textTransform: 'uppercase' }}>
                         Unused modifiers
                     </Typography>
@@ -215,7 +224,7 @@ const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProp
                                                     transform: 'translateX(20%)'
                                                 }} />
                                             </Fade>
-                                            <Chip size='small' label={modifier.name} sx={{ m: 0.5 }}
+                                            <Chip size='small' label={modifier.name} sx={{ m: 0.3 }}
                                                 onClick={() => { toggleForbiddenModifierId(modifierId) }} />
                                         </Box>
                                     </Grow>

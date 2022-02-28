@@ -1,6 +1,6 @@
 import React from 'react';
 import { window, invoke } from '@tauri-apps/api';
-import { AppBar, Box, IconButton, Toolbar, Typography, CircularProgress, Tab, Tabs } from '@mui/material';
+import { AppBar, Box, IconButton, Toolbar, Typography, Tab, Tabs } from '@mui/material';
 import { Minimize } from '@mui/icons-material';
 import { TabContext, TabPanel } from '@mui/lab';
 import GeneralPage from './GeneralPage';
@@ -19,8 +19,14 @@ export type Modifiers = {
     components: { [key: number]: { [key: number]: number } }
 };
 
+export type LabeledCombo = {
+    id: number,
+    label: string,
+    combo: number[];
+}
+
 export type UserSettings = {
-    combos: [number, number[]][];
+    labeledCombos: LabeledCombo[];
     forbiddenModifierIds: number[];
     hotkey: string;
 };
@@ -47,12 +53,16 @@ const Settings = () => {
             return;
         }
 
-        invoke('set_user_settings', {
-            userSettings: {
-                ...userSettings,
-                combos: userSettings.combos.filter(([_, combo]) => new Set(combo).size === combo.length)
-            }
-        }).catch(console.error);
+        const timeoutId = setTimeout(() => {
+            console.log('Saving user settings!');
+            invoke('set_user_settings', {
+                userSettings: {
+                    ...userSettings,
+                    combos: userSettings.labeledCombos.filter(({ combo }) => new Set(combo).size === combo.length)
+                }
+            }).catch(console.error);
+        }, 500);
+        return () => clearTimeout(timeoutId);
     }, [userSettings]);
     return (
         <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
