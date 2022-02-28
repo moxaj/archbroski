@@ -179,10 +179,10 @@ fn set_state(app: &tauri::AppHandle, state: State) {
 
 fn set_initial_hotkey(app: &tauri::AppHandle) {
     if let Ok(user_settings) = &*app.state::<Result<Mutex<UserSettings>, &'static str>>() {
-        let app_ = app.clone();
+        let app = app.clone();
         app.global_shortcut_manager()
             .register(user_settings.lock().unwrap().hotkey.as_str(), move || {
-                activate(&app_);
+                activate(&app);
             })
             .unwrap();
     }
@@ -396,11 +396,9 @@ fn set_hotkey(
     app.global_shortcut_manager()
         .unregister(accelerator)
         .unwrap();
-
-    let app_ = app.clone();
     app.global_shortcut_manager()
         .register(accelerator, move || {
-            activate(&app_);
+            activate(&app);
         })
         .unwrap();
 
