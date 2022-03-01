@@ -55,7 +55,6 @@ const Settings = () => {
         }
 
         const timeoutId = setTimeout(() => {
-            console.log('Saving user settings!');
             invoke('set_user_settings', {
                 userSettings: {
                     ...userSettings,

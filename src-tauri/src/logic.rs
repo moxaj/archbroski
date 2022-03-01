@@ -198,7 +198,7 @@ pub struct UserSettings {
 }
 
 impl DiscSynchronized for UserSettings {
-    fn new() -> Self {
+    fn create_new() -> Self {
         Self {
             labeled_combos: vec![
                 LabeledCombo::new(0, "All the uniques".to_owned(), true, vec![38, 60, 57, 58]),
@@ -408,16 +408,15 @@ pub fn suggest_modifier_id(
                 let mut modifier_ids = user_settings
                     .labeled_combos
                     .iter()
-                    .filter_map(
-                        |LabeledCombo { combo, enabled, .. }| {
-                            if *enabled {
-                                Some(combo)
-                            } else {
-                                None
-                            }
-                        },
-                    )
-                    .flat_map(|combo| {
+                    .enumerate()
+                    .filter_map(|(combo_index, LabeledCombo { combo, enabled, .. })| {
+                        if *enabled {
+                            Some(((combo_index as f32 + 1.0), combo))
+                        } else {
+                            None
+                        }
+                    })
+                    .flat_map(|(combo_priority, combo)| {
                         combo
                             .iter()
                             .flat_map(|&modifier_id| {
@@ -447,6 +446,7 @@ pub fn suggest_modifier_id(
                                     .map(|(&modifier_id, &required_count)| {
                                         (
                                             modifier_id,
+                                            combo_priority as f32,
                                             (owned_modifier_ids
                                                 .get(&modifier_id)
                                                 .copied()
@@ -457,12 +457,8 @@ pub fn suggest_modifier_id(
                                     })
                                     .collect_vec()
                             })
-                            .sorted_by(|&(_, priority1), &(_, priority2)| {
-                                priority1.partial_cmp(&priority2).unwrap_or(Equal)
-                            })
-                            .map(|(modifier_id, _)| modifier_id)
-                            .filter(|&modifier_id| {
-                                let recipe = MODIFIERS.by_id[&modifier_id].recipe.clone();
+                            .filter(|(modifier_id, _, _)| {
+                                let recipe = MODIFIERS.by_id[modifier_id].recipe.clone();
                                 if recipe.is_empty() {
                                     return false;
                                 }
@@ -476,8 +472,15 @@ pub fn suggest_modifier_id(
                                         .iter()
                                         .all(|&modifier_id| has_modifier(&stash, modifier_id))
                             })
+                            .collect_vec()
                     })
-                    .map(|modifier_id| {
+                    .map(|(modifier_id, combo_priority, modifier_priority)| {
+                        (modifier_id, (combo_priority * modifier_priority))
+                    })
+                    .sorted_by(|&(_, priority1), &(_, priority2)| {
+                        priority1.partial_cmp(&priority2).unwrap_or(Equal)
+                    })
+                    .map(|(modifier_id, _)| {
                         (
                             Some(modifier_id),
                             MODIFIERS.by_id[&modifier_id].recipe.clone(),
