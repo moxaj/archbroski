@@ -6,15 +6,6 @@ import { SentimentVeryDissatisfied } from '@mui/icons-material';
 const Error = () => {
     const [errorMessage, setErrorMessage] = React.useState<string | undefined>(undefined);
     React.useEffect(() => {
-        const keydownListener = (event: KeyboardEvent) => {
-            event.preventDefault();
-        };
-        document.addEventListener('keydown', keydownListener);
-        return () => {
-            document.removeEventListener('keydown', keydownListener);
-        };
-    }, []);
-    React.useEffect(() => {
         invoke<string>('get_error_message').then(setErrorMessage).catch(console.error);
     }, []);
     React.useEffect(() => {
