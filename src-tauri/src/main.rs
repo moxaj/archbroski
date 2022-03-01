@@ -7,29 +7,63 @@ mod image;
 mod logic;
 mod utils;
 
-use crate::image::process_image;
+use crate::image::{process_image, Screenshot};
 use crate::logic::suggest_modifier_id;
-use image::{Cache, ProcessImageResult, Rectangle};
+use dashmap::DashMap;
+use image::{ProcessImageResult, Rectangle, Vec2};
 use itertools::Itertools;
 use logic::{Hotkey, ModifierId, Modifiers, UserSettings, MODIFIERS};
-use opencv::core::{Mat, MatTraitConst};
-use opencv::imgproc::{cvt_color, COLOR_BGRA2BGR};
 use retry::delay::Fixed;
 use retry::retry;
 use scrap::{Capturer, Display};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
 use std::error::Error;
 use std::ffi::c_void;
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
 use std::sync::Mutex;
 use tauri::{GlobalShortcutManager, Manager, WindowBuilder};
 use thiserror::Error;
-use utils::DiscSynchronized;
+use utils::{BincodeDiscSynchronized, DiscSynchronized};
 #[cfg(target_os = "windows")]
 use windows::Win32::{
     Foundation::{BOOL, HWND},
     Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_TRANSITIONS_FORCEDISABLED},
 };
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Cache {
+    pub modified: bool,
+    pub layout: Option<HashMap<u8, Vec2>>,
+    pub images: DashMap<u64, Option<ModifierId>>,
+    pub suggested_modifier_ids: HashMap<u64, Option<ModifierId>>,
+}
+
+impl DiscSynchronized for Cache {
+    fn create_new() -> Self {
+        Self {
+            modified: false,
+            layout: None,
+            images: DashMap::new(),
+            suggested_modifier_ids: HashMap::new(),
+        }
+    }
+
+    fn file_name() -> &'static str {
+        "archbroski\\.cache"
+    }
+
+    fn save_impl(&self, writer: &mut BufWriter<File>) -> Result<(), Box<dyn Error>> {
+        <Self as BincodeDiscSynchronized>::save_impl(self, writer)
+    }
+
+    fn load_impl(reader: BufReader<File>) -> Result<Self, Box<dyn Error>> {
+        <Self as BincodeDiscSynchronized>::load_impl(reader)
+    }
+}
+
+impl BincodeDiscSynchronized for Cache {}
 
 #[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -47,11 +81,9 @@ impl Highlight {
     }
 }
 
-struct GlobalComputationId(u64);
-
 #[derive(Clone, Copy, Debug, Serialize)]
 #[serde(tag = "type")]
-enum State {
+enum ActivationState {
     Hidden,
     Computing { id: u64 },
     Computed(Highlight),
@@ -59,27 +91,8 @@ enum State {
     LogicError,
 }
 
-struct Screenshot {
-    buffer: Vec<u8>,
-    size: (usize, usize),
-}
-
-impl Screenshot {
-    fn new(buffer: Vec<u8>, size: (usize, usize)) -> Self {
-        Self { buffer, size }
-    }
-
-    fn into_mat(self) -> Result<Mat, Box<dyn Error>> {
-        let mat1 = Mat::from_slice(&self.buffer).unwrap();
-        let mat1 = mat1.reshape(4, self.size.1 as i32).unwrap();
-        let mut mat2 = Mat::default();
-        cvt_color(&mat1, &mut mat2, COLOR_BGRA2BGR, 0).unwrap();
-        Ok(mat2)
-    }
-}
-
 #[derive(Error, Debug)]
-pub enum ActivationError {
+enum ActivationError {
     #[error("failed to parse the taken screenshot")]
     DetectionError,
     #[error("failed to suggest a modifier")]
@@ -169,12 +182,161 @@ fn show_settings_window(app: &tauri::AppHandle) {
     }
 }
 
-fn get_state(app: &tauri::AppHandle) -> State {
-    *app.state::<Mutex<State>>().lock().unwrap()
-}
+fn activate(app: &tauri::AppHandle) {
+    if let Ok(mut activation_state_guard) = app.state::<Mutex<(u64, ActivationState)>>().try_lock()
+    {
+        if !matches!(activation_state_guard.1, ActivationState::Hidden) {
+            return;
+        }
 
-fn set_state(app: &tauri::AppHandle, state: State) {
-    *app.state::<Mutex<State>>().lock().unwrap() = state;
+        activation_state_guard.0 += 1;
+        activation_state_guard.1 = ActivationState::Computing {
+            id: activation_state_guard.0,
+        };
+        let activation_id = activation_state_guard.0;
+        app.get_window("overlay")
+            .unwrap()
+            .emit("update", activation_state_guard.1)
+            .unwrap();
+        drop(activation_state_guard);
+
+        let app = app.clone();
+        std::thread::spawn(move || {
+            if let Err(error) = Display::primary()
+                .map_err(|_| ActivationError::DetectionError)
+                .and_then(|display| {
+                    Capturer::new(display).map_err(|_| ActivationError::DetectionError)
+                })
+                .and_then(|mut capturer| {
+                    retry(Fixed::from_millis(20).take(10), || {
+                        let capturer_width = capturer.width();
+                        let capturer_height = capturer.height();
+                        capturer
+                            .frame()
+                            .map(|frame| (frame.to_vec(), capturer_width, capturer_height))
+                    })
+                    .map_err(|_| ActivationError::DetectionError)
+                })
+                .and_then(|(buffer, width, height)| {
+                    let cache_state = app.state::<Result<Mutex<Cache>, &'static str>>();
+                    let cache_state = cache_state.as_ref();
+                    let mut cache = cache_state.unwrap().lock().unwrap();
+                    cache.modified = false;
+                    timed!(
+                        "process_image",
+                        process_image(
+                            &mut cache,
+                            Screenshot {
+                                buffer,
+                                width,
+                                height
+                            },
+                        )
+                    )
+                    .ok_or_else(|| ActivationError::DetectionError)
+                })
+                .and_then(
+                    |ProcessImageResult {
+                         stash_area,
+                         stash_modifier_ids,
+                         queue_modifier_ids,
+                         ..
+                     }| {
+                        let stash_by_modifier_ids = stash_modifier_ids.iter().fold(
+                            HashMap::<ModifierId, BTreeSet<Rectangle>>::new(),
+                            |mut stash_by_modifier_ids, (&cell_area, &modifier_id)| {
+                                if let Some(modifier_id) = modifier_id {
+                                    stash_by_modifier_ids
+                                        .entry(modifier_id)
+                                        .or_default()
+                                        .insert(cell_area);
+                                }
+
+                                stash_by_modifier_ids
+                            },
+                        );
+
+                        let cache_state = app.state::<Result<Mutex<Cache>, &'static str>>();
+                        let cache_state = cache_state.as_ref();
+                        let mut cache = cache_state.unwrap().lock().unwrap();
+
+                        let user_settings_state =
+                            app.state::<Result<Mutex<UserSettings>, &'static str>>();
+                        let user_settings_state = user_settings_state.as_ref();
+                        let user_settings = &mut *user_settings_state.unwrap().lock().unwrap();
+                        timed!(
+                            "logic",
+                            suggest_modifier_id(
+                                &mut cache,
+                                user_settings,
+                                stash_modifier_ids
+                                    .values()
+                                    .filter_map(|modifier_id| modifier_id.as_ref())
+                                    .copied()
+                                    .counts()
+                                    .into_iter()
+                                    .collect(),
+                                queue_modifier_ids
+                                    .iter()
+                                    .filter_map(|modifier_id| modifier_id.as_ref())
+                                    .copied()
+                                    .collect_vec()
+                            )
+                        )
+                        .ok_or_else(|| ActivationError::LogicError)
+                        .and_then(|suggested_modifier_id| {
+                            println!("{:?}", suggested_modifier_id);
+                            if cache.modified {
+                                println!("Saving cache");
+                                cache.save().map_err(|_| ActivationError::DetectionError)?;
+                            }
+
+                            Ok(suggested_modifier_id)
+                        })
+                        .map(|suggested_modifier_id| {
+                            let suggested_cell_area = *stash_by_modifier_ids
+                                [&suggested_modifier_id]
+                                .iter()
+                                .next()
+                                .unwrap();
+
+                            let activation_state_state =
+                                app.state::<Mutex<(u64, ActivationState)>>();
+                            let mut activation_state_guard = activation_state_state.lock().unwrap();
+                            if let ActivationState::Computing { id } = activation_state_guard.1 {
+                                if id == activation_id {
+                                    activation_state_guard.1 = ActivationState::Computed(
+                                        Highlight::new(stash_area, suggested_cell_area),
+                                    );
+                                    app.get_window("overlay")
+                                        .unwrap()
+                                        .emit("update", activation_state_guard.1)
+                                        .unwrap();
+                                } else {
+                                    println!("Expired {} {}", id, activation_id);
+                                }
+                            }
+                        })
+                    },
+                )
+            {
+                let activation_state_state = app.state::<Mutex<(u64, ActivationState)>>();
+                let mut activation_state_guard = activation_state_state.lock().unwrap();
+                if let ActivationState::Computing { id } = activation_state_guard.1 {
+                    if id == activation_id {
+                        activation_state_guard.1 = match error {
+                            ActivationError::DetectionError => ActivationState::DetectionError,
+                            ActivationError::LogicError => ActivationState::LogicError,
+                        };
+                        app.get_window("overlay")
+                            .unwrap()
+                            .emit("update", activation_state_guard.1)
+                            .unwrap();
+                    }
+                }
+            }
+        });
+    }
 }
 
 fn set_initial_hotkey(app: &tauri::AppHandle) {
@@ -186,148 +348,6 @@ fn set_initial_hotkey(app: &tauri::AppHandle) {
             })
             .unwrap();
     }
-}
-
-fn update_overlay(app: &tauri::AppHandle, state: State) {
-    let app_ = app.clone();
-    app.run_on_main_thread(move || {
-        set_state(&app_, state);
-        app_.get_window("overlay")
-            .unwrap()
-            .emit("update", state)
-            .unwrap();
-    })
-    .unwrap();
-}
-
-fn activate(app: &tauri::AppHandle) {
-    if !matches!(get_state(app), State::Hidden) {
-        return;
-    }
-
-    let global_computation_id_state = app.state::<Mutex<GlobalComputationId>>();
-    let mut global_computation_id_mutex = global_computation_id_state.lock().unwrap();
-    global_computation_id_mutex.0 += 1;
-    let current_computation_id = global_computation_id_mutex.0;
-    drop(global_computation_id_mutex);
-    update_overlay(
-        app,
-        State::Computing {
-            id: current_computation_id,
-        },
-    );
-
-    let app = app.clone();
-    std::thread::spawn(move || {
-        if let Err(error) = Display::primary()
-            .map_err(|_| ActivationError::DetectionError)
-            .and_then(|display| Capturer::new(display).map_err(|_| ActivationError::DetectionError))
-            .and_then(|mut capturer| {
-                retry(Fixed::from_millis(20).take(10), || {
-                    let capturer_width = capturer.width();
-                    let capturer_height = capturer.height();
-                    capturer
-                        .frame()
-                        .map(|frame| (frame.to_vec(), capturer_width, capturer_height))
-                })
-                .map_err(|_| ActivationError::DetectionError)
-            })
-            .and_then(|(buffer, width, height)| {
-                let cache_state = app.state::<Result<Mutex<Cache>, &'static str>>();
-                let cache_state = cache_state.as_ref();
-                let mut cache = cache_state.unwrap().lock().unwrap();
-                timed!(
-                    "process_image",
-                    process_image(
-                        &mut cache,
-                        Screenshot::new(buffer, (width, height)).into_mat().unwrap(),
-                    )
-                )
-                .ok_or_else(|| ActivationError::DetectionError)
-                .and_then(|process_image_result| {
-                    if process_image_result.cache_modified {
-                        cache.save().map_err(|_| ActivationError::DetectionError)?;
-                    }
-
-                    Ok(process_image_result)
-                })
-            })
-            .and_then(
-                |ProcessImageResult {
-                     stash_area,
-                     stash_modifier_ids,
-                     queue_modifier_ids,
-                     ..
-                 }| {
-                    let stash_by_modifier_ids = stash_modifier_ids.iter().fold(
-                        HashMap::<ModifierId, BTreeSet<Rectangle>>::new(),
-                        |mut stash_by_modifier_ids, (&cell_area, &modifier_id)| {
-                            if let Some(modifier_id) = modifier_id {
-                                stash_by_modifier_ids
-                                    .entry(modifier_id)
-                                    .or_default()
-                                    .insert(cell_area);
-                            }
-
-                            stash_by_modifier_ids
-                        },
-                    );
-                    let user_settings_state =
-                        app.state::<Result<Mutex<UserSettings>, &'static str>>();
-                    let user_settings_state = user_settings_state.as_ref();
-                    let user_settings = &mut *user_settings_state.unwrap().lock().unwrap();
-                    timed!(
-                        "logic",
-                        suggest_modifier_id(
-                            user_settings,
-                            stash_modifier_ids
-                                .values()
-                                .filter_map(|modifier_id| modifier_id.as_ref())
-                                .copied()
-                                .counts()
-                                .into_iter()
-                                .collect(),
-                            queue_modifier_ids
-                                .iter()
-                                .filter_map(|modifier_id| modifier_id.as_ref())
-                                .copied()
-                                .collect_vec()
-                        )
-                    )
-                    .ok_or_else(|| ActivationError::LogicError)
-                    .map(|suggested_modifier_id| {
-                        let suggested_cell_area = *stash_by_modifier_ids[&suggested_modifier_id]
-                            .iter()
-                            .next()
-                            .unwrap();
-                        if let State::Computing { id } = get_state(&app) {
-                            if id == current_computation_id {
-                                update_overlay(
-                                    &app,
-                                    State::Computed(Highlight::new(
-                                        stash_area,
-                                        suggested_cell_area,
-                                    )),
-                                );
-                            }
-                        }
-                    })
-                },
-            )
-        {
-            if let State::Computing { id } = get_state(&app) {
-                if id == current_computation_id {
-                    update_overlay(
-                        &app,
-                        match error {
-                            ActivationError::DetectionError => State::DetectionError,
-                            ActivationError::LogicError => State::LogicError,
-                        },
-                    );
-                }
-            }
-        }
-    });
 }
 
 #[tauri::command(async)]
@@ -408,7 +428,10 @@ fn set_hotkey(
 #[tauri::command(async)]
 fn hide_overlay_window(app: tauri::AppHandle, overlay_window: tauri::Window) {
     overlay_window.hide().unwrap();
-    set_state(&app, State::Hidden);
+    app.state::<Mutex<(u64, ActivationState)>>()
+        .lock()
+        .unwrap()
+        .1 = ActivationState::Hidden;
 }
 
 #[tauri::command(async)]
@@ -458,7 +481,7 @@ fn main() {
                     .map_err(|_| "failed_to_load_user_settings"),
             );
             app.manage(
-                Cache::load()
+                Cache::load_or_new_saved()
                     .map(Mutex::new)
                     .map_err(|_| "failed_to_load_cache"),
             );
@@ -470,8 +493,7 @@ fn main() {
             {
                 create_error_window(&app.handle());
             } else {
-                app.manage(Mutex::new(GlobalComputationId(0)));
-                app.manage(Mutex::new(State::Hidden));
+                app.manage(Mutex::new((0u64, ActivationState::Hidden)));
                 create_overlay_window(&app.handle());
                 set_initial_hotkey(&app.handle());
             }

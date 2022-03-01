@@ -32,20 +32,6 @@ macro_rules! timed {
     }};
 }
 
-#[macro_export]
-macro_rules! memoized {
-    ($input:expr, $cache:expr, $body:expr) => {{
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        let mut hasher = DefaultHasher::new();
-        $input.hash(&mut hasher);
-        let hash = hasher.finish();
-
-        *$cache.lock().unwrap().entry(hash).or_insert_with(|| $body)
-    }};
-}
-
 pub trait DiscSynchronized: Sized + Serialize + DeserializeOwned {
     fn create_new() -> Self;
 

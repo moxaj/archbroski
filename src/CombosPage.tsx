@@ -153,7 +153,7 @@ const CombosPage = ({ userSettings, setUserSettings, modifiers }: CombosPageProp
                     <Help />
                 </IconButton>
                 <HelpDialog open={helpVisible} onClose={() => { setHelpVisible(false) }} />
-                <Box sx={{ width: 1, height: 380, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', overflow: 'auto' }}>
+                <Box sx={{ width: 1, height: 400, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', overflow: 'auto' }}>
                     <TransitionGroup>
                         {userSettings.labeledCombos.map(({ id: comboId, label, enabled, combo }) => (
                             <Collapse key={comboId}>

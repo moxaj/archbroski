@@ -1,12 +1,10 @@
-use crate::collection;
 use crate::logic::{ModifierId, MODIFIERS};
-use crate::utils::{BincodeDiscSynchronized, DiscSynchronized};
-use dashmap::DashMap;
+use crate::{collection, Cache};
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use opencv::core::{min_max_loc, Point, Scalar, CV_32F, CV_8U};
 use opencv::imgcodecs::IMREAD_COLOR;
-use opencv::imgproc::{cvt_color, COLOR_BGR2GRAY};
+use opencv::imgproc::{cvt_color, COLOR_BGR2GRAY, COLOR_BGRA2BGR};
 use opencv::prelude::*;
 use opencv::{
     core::{Mat, MatExprTraitConst, MatTraitConstManual, Range, Size, Vector},
@@ -19,11 +17,9 @@ use std::borrow::Cow;
 use std::cmp::Ordering::Equal;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
-use std::fs::File;
 use std::hash::{Hash, Hasher};
-use std::io::{BufReader, BufWriter};
 use std::sync::Mutex;
-use std::{collections::HashMap, error::Error, ops::Deref};
+use std::{collections::HashMap, ops::Deref};
 
 macro_rules! import_images {
     ($($s:expr),*) => {
@@ -33,87 +29,6 @@ macro_rules! import_images {
     };
 }
 
-/// A 2-dimensional vector.
-#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Vec2 {
-    pub x: u32,
-    pub y: u32,
-}
-
-impl Vec2 {
-    pub fn new(x: u32, y: u32) -> Self {
-        Self { x, y }
-    }
-}
-
-/// A rectangle.
-#[derive(
-    Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug, Serialize, Deserialize,
-)]
-pub struct Rectangle {
-    pub x: u32,
-    pub y: u32,
-    pub width: u32,
-    pub height: u32,
-}
-
-impl Rectangle {
-    pub fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
-        Self {
-            x,
-            y,
-            width,
-            height,
-        }
-    }
-
-    pub fn translate(&self, offset: Vec2) -> Rectangle {
-        Rectangle::new(
-            self.x + offset.x,
-            self.y + offset.y,
-            self.width,
-            self.height,
-        )
-    }
-}
-
-/// A cell.
-#[derive(Debug)]
-struct Cell {
-    tag: u8,
-    area: Rectangle,
-}
-
-/// A group of cells.
-struct CellGroup {
-    template: Mat,
-    grayscale: bool,
-    area: Rectangle,
-    cell_areas: HashSet<Rectangle>,
-}
-
-/// A Mat wrapper which is Sync.
-struct MatSync(Mat);
-
-unsafe impl Sync for MatSync {}
-
-impl Deref for MatSync {
-    type Target = Mat;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-/// The result of the image recognition algorithm.
-pub struct ProcessImageResult {
-    pub stash_area: Rectangle,
-    pub stash_modifier_ids: HashMap<Rectangle, Option<ModifierId>>,
-    pub queue_modifier_ids: Vec<Option<ModifierId>>,
-    pub cache_modified: bool,
-}
-
-/// The cell group templates (for the stash and the queue).
 static CELL_GROUPS: Lazy<HashMap<u8, Mutex<CellGroup>>> = Lazy::new(|| {
     let stash = {
         let template = imdecode(
@@ -173,7 +88,6 @@ static CELL_GROUPS: Lazy<HashMap<u8, Mutex<CellGroup>>> = Lazy::new(|| {
     ]
 });
 
-/// The modifier templates.
 static MODIFIER_TEMPLATES: Lazy<Mutex<HashMap<&str, (Mat, Mat)>>> = Lazy::new(|| {
     let modifier_templates: HashMap<_, _> = import_images!(
         "Abberath-Touched",
@@ -256,91 +170,102 @@ static MODIFIER_TEMPLATES: Lazy<Mutex<HashMap<&str, (Mat, Mat)>>> = Lazy::new(||
     )
 });
 
-/// A serializable cache.
-#[derive(Serialize, Deserialize)]
-struct SerializableCache {
-    layout: Option<HashMap<u8, Vec2>>,
-    images: HashMap<u64, Option<ModifierId>>,
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Vec2 {
+    pub x: u32,
+    pub y: u32,
 }
 
-impl DiscSynchronized for SerializableCache {
-    fn create_new() -> Self {
+impl Vec2 {
+    pub fn new(x: u32, y: u32) -> Self {
+        Self { x, y }
+    }
+}
+
+#[derive(
+    Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug, Serialize, Deserialize,
+)]
+pub struct Rectangle {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl Rectangle {
+    pub fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
         Self {
-            layout: None,
-            images: HashMap::new(),
+            x,
+            y,
+            width,
+            height,
         }
     }
 
-    fn file_name() -> &'static str {
-        "archbroski\\.cache"
-    }
-
-    fn save_impl(&self, writer: &mut BufWriter<File>) -> Result<(), Box<dyn Error>> {
-        <Self as BincodeDiscSynchronized>::save_impl(self, writer)
-    }
-
-    fn load_impl(reader: BufReader<File>) -> Result<Self, Box<dyn Error>> {
-        <Self as BincodeDiscSynchronized>::load_impl(reader)
+    pub fn translate(&self, offset: Vec2) -> Rectangle {
+        Rectangle::new(
+            self.x + offset.x,
+            self.y + offset.y,
+            self.width,
+            self.height,
+        )
     }
 }
 
-impl BincodeDiscSynchronized for SerializableCache {}
-
-#[derive(PartialEq, Eq)]
-pub struct CacheSnapshot {
-    image_count: usize,
-    layout: Option<HashMap<u8, Vec2>>,
+#[derive(Debug)]
+struct Cell {
+    tag: u8,
+    area: Rectangle,
 }
 
-/// A cache to store recognized layouts and modifiers.
-pub struct Cache {
-    pub images: DashMap<u64, Option<ModifierId>>,
-    pub layout: Option<HashMap<u8, Vec2>>,
+struct CellGroup {
+    template: Mat,
+    grayscale: bool,
+    area: Rectangle,
+    cell_areas: HashSet<Rectangle>,
 }
 
-impl Cache {
-    fn from_serialized(serializable_cache: SerializableCache) -> Self {
-        Self {
-            images: serializable_cache.images.into_iter().collect(),
-            layout: serializable_cache.layout,
-        }
-    }
+struct MatSync(Mat);
 
-    fn to_serialized(&self) -> SerializableCache {
-        SerializableCache {
-            images: self
-                .images
-                .iter()
-                .map(|entry| (*entry.key(), *entry.value()))
-                .collect(),
-            layout: self.layout.clone(),
-        }
-    }
+unsafe impl Sync for MatSync {}
 
-    pub fn to_snapshot(&self) -> CacheSnapshot {
-        CacheSnapshot {
-            image_count: self.images.len(),
-            layout: self.layout.clone(),
-        }
-    }
+impl Deref for MatSync {
+    type Target = Mat;
 
-    pub fn load() -> Result<Self, Box<dyn Error>> {
-        SerializableCache::load_or_new_saved().map(Self::from_serialized)
-    }
-
-    pub fn save(&self) -> Result<(), Box<dyn Error>> {
-        self.to_serialized().save()
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
-/// Converts the given image to grayscale.
+#[derive(Clone, Debug)]
+pub struct Screenshot {
+    pub buffer: Vec<u8>,
+    pub width: usize,
+    pub height: usize,
+}
+
+impl Screenshot {
+    fn into_mat(self) -> Mat {
+        let temp_mat = Mat::from_slice(&self.buffer).unwrap();
+        let temp_mat = temp_mat.reshape(4, self.height as i32).unwrap();
+        let mut mat = Mat::default();
+        cvt_color(&temp_mat, &mut mat, COLOR_BGRA2BGR, 0).unwrap();
+        mat
+    }
+}
+
+pub struct ProcessImageResult {
+    pub stash_area: Rectangle,
+    pub stash_modifier_ids: HashMap<Rectangle, Option<ModifierId>>,
+    pub queue_modifier_ids: Vec<Option<ModifierId>>,
+}
+
 fn to_grayscale(image: &Mat) -> Mat {
     let mut image_grayscale = Mat::default();
     cvt_color(&image, &mut image_grayscale, COLOR_BGR2GRAY, 0).unwrap();
     image_grayscale
 }
 
-/// Returns a cropped image.
 fn crop_image(image: &Mat, padding: u32) -> Mat {
     let image_size = image.size().unwrap();
     let image = image.clone();
@@ -373,7 +298,6 @@ fn crop_image(image: &Mat, padding: u32) -> Mat {
     image
 }
 
-/// Calculates the hash of an image.
 fn hash_image(image: &Mat) -> u64 {
     let image = if image.is_continuous() {
         Cow::Borrowed(image)
@@ -386,7 +310,6 @@ fn hash_image(image: &Mat) -> u64 {
     hasher.finish()
 }
 
-/// Runs a template matching for the given image and template.
 fn match_template(source: &Mat, template: &Mat) -> (Vec2, f32) {
     let source_size = source.size().unwrap();
     let source_width = source_size.width;
@@ -429,7 +352,6 @@ fn match_template(source: &Mat, template: &Mat) -> (Vec2, f32) {
     )
 }
 
-/// Returns the detected layout for the given screenshot.
 fn get_layout(cache: &mut Cache, screenshot: &Mat) -> Option<HashMap<u8, Vec2>> {
     cache.layout = cache
         .layout
@@ -472,13 +394,13 @@ fn get_layout(cache: &mut Cache, screenshot: &Mat) -> Option<HashMap<u8, Vec2>> 
             if layout.len() < CELL_GROUPS.len() {
                 None
             } else {
+                cache.modified = true;
                 Some(layout)
             }
         });
-    cache.layout.clone() // Wish I could return a reference..
+    cache.layout.clone()
 }
 
-/// Returns the cells of the given screenshot.
 fn get_cells(layout: &HashMap<u8, Vec2>) -> Vec<Cell> {
     CELL_GROUPS
         .iter()
@@ -497,9 +419,8 @@ fn get_cells(layout: &HashMap<u8, Vec2>) -> Vec<Cell> {
         .collect_vec()
 }
 
-/// Returns the modifier id for the given cell.
 fn get_modifier_id(
-    cache: &Mutex<&mut Cache>,
+    cache: &mut Cache,
     screenshot: &Mat,
     cell: &Cell,
     grayscale: bool,
@@ -512,8 +433,6 @@ fn get_modifier_id(
     .unwrap();
     let cell_image_grayscale = to_grayscale(&cell_image);
     let modifier_id = *cache
-        .lock()
-        .unwrap()
         .images
         .entry(hash_image(&crop_image(&cell_image, 10)))
         .or_insert_with(|| {
@@ -543,6 +462,7 @@ fn get_modifier_id(
                 .max_by(|&(_, score1), &(_, score2)| score1.partial_cmp(&score2).unwrap_or(Equal))
                 .unwrap();
             if score.is_normal() && score > 0.8 {
+                cache.modified = true;
                 Some(modifier_id)
             } else {
                 None
@@ -552,25 +472,24 @@ fn get_modifier_id(
     modifier_id
 }
 
-/// Processes the given screenshot.
-pub fn process_image(cache: &mut Cache, screenshot: Mat) -> Option<ProcessImageResult> {
+pub fn process_image(cache: &mut Cache, screenshot: Screenshot) -> Option<ProcessImageResult> {
+    let screenshot = screenshot.into_mat();
     let screenshot_sync = MatSync(screenshot.clone());
-    let cache_snapshot = cache.to_snapshot();
     get_layout(cache, &screenshot).map(|layout| {
-        let cache_mutex = Mutex::new(cache);
         let cells = get_cells(&layout);
+        let cache_mutex = Mutex::new(cache);
         let modifier_ids = cells
             .into_par_iter()
             .map(|cell| {
+                let mut cache = cache_mutex.lock().unwrap();
                 let grayscale = CELL_GROUPS[&cell.tag].lock().unwrap().grayscale;
                 (
                     cell.tag,
                     cell.area,
-                    get_modifier_id(&cache_mutex, &screenshot_sync, &cell, grayscale),
+                    get_modifier_id(&mut cache, &screenshot_sync, &cell, grayscale),
                 )
             })
             .collect::<Vec<_>>();
-        let cache = cache_mutex.into_inner().unwrap();
         let modifier_ids_by_tags = modifier_ids.iter().into_group_map_by(|&&(tag, _, _)| tag);
         ProcessImageResult {
             stash_area: CELL_GROUPS[&0].lock().unwrap().area.translate(layout[&0]),
@@ -588,7 +507,6 @@ pub fn process_image(cache: &mut Cache, screenshot: Mat) -> Option<ProcessImageR
                 .sorted_by_key(|&(x, _)| x)
                 .map(|(_, modifier_id)| modifier_id)
                 .collect(),
-            cache_modified: cache.to_snapshot() != cache_snapshot,
         }
     })
 }
