@@ -285,9 +285,7 @@ fn activate(app: &tauri::AppHandle) {
                         )
                         .ok_or_else(|| ActivationError::LogicError)
                         .and_then(|suggested_modifier_id| {
-                            println!("{:?}", suggested_modifier_id);
                             if cache.modified {
-                                println!("Saving cache");
                                 cache.save().map_err(|_| ActivationError::DetectionError)?;
                             }
 
@@ -312,8 +310,6 @@ fn activate(app: &tauri::AppHandle) {
                                         .unwrap()
                                         .emit("update", activation_state_guard.1)
                                         .unwrap();
-                                } else {
-                                    println!("Expired {} {}", id, activation_id);
                                 }
                             }
                         })

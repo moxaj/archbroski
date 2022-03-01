@@ -244,8 +244,12 @@ impl DiscSynchronized for UserSettings {
 
 impl JsonDiscSynchronized for UserSettings {}
 
-fn has_modifier(stash: &BTreeMap<ModifierId, usize>, modifier_id: ModifierId) -> bool {
-    stash.get(&modifier_id).copied().unwrap_or_default() > 0
+fn owned_modifier_count(stash: &BTreeMap<ModifierId, usize>, modifier_id: ModifierId) -> usize {
+    stash.get(&modifier_id).copied().unwrap_or_default()
+}
+
+fn owns_modifier(stash: &BTreeMap<ModifierId, usize>, modifier_id: ModifierId) -> bool {
+    owned_modifier_count(stash, modifier_id) > 0
 }
 
 fn get_combo_value(combo: &[ModifierId]) -> f32 {
@@ -388,7 +392,7 @@ pub fn suggest_modifier_id(
                         && combo
                             .iter()
                             .skip(queue.len())
-                            .all(|&modifier_id| has_modifier(&stash, modifier_id))
+                            .all(|&modifier_id| owns_modifier(&stash, modifier_id))
                 })
                 .cloned()
                 .or_else(|| {
@@ -460,7 +464,7 @@ pub fn suggest_modifier_id(
                                     !remanining_recipe.is_empty()
                                         && remanining_recipe
                                             .iter()
-                                            .all(|&modifier_id| has_modifier(&stash, modifier_id))
+                                            .all(|&modifier_id| owns_modifier(&stash, modifier_id))
                                 })
                                 .collect_vec()
                         })
@@ -480,15 +484,22 @@ pub fn suggest_modifier_id(
                     modifier_ids.extend(
                         filler_modifiers_ids
                             .iter()
-                            .filter(|&&modifier_id| has_modifier(&stash, modifier_id))
+                            .sorted_by(|&&modifier_id1, &&modifier_id2| {
+                                Ord::cmp(
+                                    &owned_modifier_count(&stash, modifier_id1),
+                                    &owned_modifier_count(&stash, modifier_id2),
+                                )
+                                .reverse()
+                            })
+                            .filter(|&&modifier_id| owns_modifier(&stash, modifier_id))
                             .map(|&modifier_id| (None, collection![modifier_id])),
                     );
 
                     let mut indices = vec![-1i32];
-                    let mut suggested_combo_and_value: Option<(Vec<ModifierId>, f32)> = None;
+                    let mut suggestion: Option<(Vec<ModifierId>, f32, usize)> = None;
                     loop {
                         if time_before.elapsed().as_millis() > TIME_BUDGET_MS
-                            && suggested_combo_and_value.is_some()
+                            && suggestion.is_some()
                         {
                             break;
                         }
@@ -543,26 +554,26 @@ pub fn suggest_modifier_id(
                                     .map(|(combo, value)| (index, combo, value))
                                 })
                             {
-                                if combo.len() == QUEUE_LENGTH as usize
-                                    && combo
-                                        .iter()
-                                        .filter(|&modifier_id| {
-                                            filler_modifiers_ids.contains(modifier_id)
-                                        })
-                                        .count()
-                                        <= 1
-                                {
-                                    suggested_combo_and_value = Some((combo, value));
+                                let filler_count = combo
+                                    .iter()
+                                    .filter(|&modifier_id| {
+                                        filler_modifiers_ids.contains(modifier_id)
+                                    })
+                                    .count();
+                                if combo.len() == QUEUE_LENGTH && filler_count == 0 {
+                                    suggestion = Some((combo, value, 0));
                                     break;
                                 }
 
-                                if suggested_combo_and_value.is_none() || {
-                                    let (combo_, value_) =
-                                        suggested_combo_and_value.as_ref().unwrap();
+                                if suggestion.is_none() || {
+                                    let (combo_, value_, filler_count_) =
+                                        suggestion.as_ref().unwrap();
                                     combo.len() > combo_.len()
-                                        || combo.len() == combo_.len() && value > *value_
+                                        || combo.len() == combo_.len()
+                                            && value > *value_
+                                            && filler_count <= *filler_count_
                                 } {
-                                    suggested_combo_and_value = Some((combo, value));
+                                    suggestion = Some((combo, value, filler_count));
                                 }
 
                                 indices.push(index as i32);
@@ -573,7 +584,7 @@ pub fn suggest_modifier_id(
                         }
                     }
 
-                    suggested_combo_and_value.map(|(suggested_combo, _)| suggested_combo)
+                    suggestion.map(|(suggested_combo, _, _)| suggested_combo)
                 })
                 .map(|suggested_combo| suggested_combo[queue.len()])
         })
