@@ -47,7 +47,7 @@ macro_rules! memoized {
 }
 
 pub trait DiscSynchronized: Sized + Serialize + DeserializeOwned {
-    fn new() -> Self;
+    fn create_new() -> Self;
 
     fn file_name() -> &'static str;
 
@@ -73,7 +73,7 @@ pub trait DiscSynchronized: Sized + Serialize + DeserializeOwned {
     }
 
     fn new_saved() -> Result<Self, Box<dyn Error>> {
-        let value = Self::new();
+        let value = Self::create_new();
         value.save()?;
         Ok(value)
     }
