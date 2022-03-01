@@ -264,7 +264,7 @@ struct SerializableCache {
 }
 
 impl DiscSynchronized for SerializableCache {
-    fn new() -> Self {
+    fn create_new() -> Self {
         Self {
             layout: None,
             images: HashMap::new(),
