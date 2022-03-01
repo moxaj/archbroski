@@ -209,13 +209,13 @@ fn activate(app: &tauri::AppHandle) {
     let mut global_computation_id_mutex = global_computation_id_state.lock().unwrap();
     global_computation_id_mutex.0 += 1;
     let current_computation_id = global_computation_id_mutex.0;
+    drop(global_computation_id_mutex);
     update_overlay(
         app,
         State::Computing {
             id: current_computation_id,
         },
     );
-    drop(global_computation_id_mutex);
 
     let app = app.clone();
     std::thread::spawn(move || {
