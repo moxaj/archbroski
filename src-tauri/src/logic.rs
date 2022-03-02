@@ -157,8 +157,6 @@ impl Modifiers {
     }
 }
 
-pub type Hotkey = String;
-
 pub type ComboId = u64;
 
 #[derive(Hash, PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
