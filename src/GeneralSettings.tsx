@@ -10,18 +10,42 @@ type GeneralSettingsProps = {
 }
 
 const GeneralSettings = ({ userSettings, setUserSettings }: GeneralSettingsProps) => {
-    const setHotkey = (hotkey: string) => {
-        setUserSettings(userSettings => ({
-            ...userSettings!,
-            hotkey
-        }));
-    };
     const [recordingHotkey, setRecordingHotkey] = React.useState(false);
     React.useEffect(() => {
         const keydownListener = (event: KeyboardEvent) => {
+            event.preventDefault();
             if (recordingHotkey) {
                 if (event.key === 'Escape') {
                     setRecordingHotkey(false);
+                } else {
+                    let hotkey = '';
+                    if (event.ctrlKey) {
+                        hotkey += 'ctrl + ';
+                    }
+
+                    if (event.altKey) {
+                        hotkey += 'alt + ';
+                    }
+
+                    if (event.shiftKey) {
+                        hotkey += 'shift + '
+                    }
+
+                    if (/Key./.test(event.code)) {
+                        hotkey += event.code.substring(3);
+                    } else if (/Digit[0-9]/.test(event.code)) {
+                        hotkey += event.code.substring(5);
+                    } else if (/F[0-9]/.test(event.code)) {
+                        hotkey += event.code;
+                    } else {
+                        return;
+                    }
+
+                    setRecordingHotkey(false);
+                    setUserSettings(userSettings => ({
+                        ...userSettings!,
+                        hotkey
+                    }));
                 }
             }
         };
@@ -30,56 +54,16 @@ const GeneralSettings = ({ userSettings, setUserSettings }: GeneralSettingsProps
             document.removeEventListener('keydown', keydownListener);
         };
     }, [recordingHotkey]);
-    React.useEffect(() => {
-        const keydownListener = (event: KeyboardEvent) => {
-            event.preventDefault();
-            if (recordingHotkey) {
-                console.log(event);
-                if (event.key === 'Escape') {
-                    setRecordingHotkey(false);
-                } else {
-                    let s = '';
-                    if (event.ctrlKey) {
-                        s += 'ctrl + ';
-                    }
-
-                    if (event.altKey) {
-                        s += 'alt + ';
-                    }
-
-                    if (event.shiftKey) {
-                        s += 'shift + '
-                    }
-
-                    if (event.code.startsWith('Key')) {
-                        s += event.code.substring(3);
-                    } else if (event.code.startsWith('Digit')) {
-                        s += event.code.substring(5);
-                    }
-
-                    console.log(s);
-                    invoke('test', { hotkey: s });
-                    setRecordingHotkey(false);
-                }
-            }
-        };
-        document.addEventListener('keypress', keydownListener);
-        return () => {
-            document.removeEventListener('keypress', keydownListener);
-        };
-    }, [recordingHotkey]);
     return (
         <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
             <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ display: 'flex' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                        <Typography>
+                        <Typography sx={{ my: 1 }}>
                             Hotkey
                         </Typography>
                         <Button variant='outlined' sx={{ width: 200 }} onClick={() => { setRecordingHotkey(true) }}>
-                            {recordingHotkey
-                                ? 'Press a key...'
-                                : userSettings.hotkey}
+                            {recordingHotkey ? 'Press a key...' : userSettings.hotkey}
                         </Button>
                     </Box>
                 </Box>

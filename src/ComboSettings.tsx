@@ -37,8 +37,10 @@ const HelpDialog = ({ open, onClose }: HelpDialogProps) => {
                     topmost with the highest, bottommost with the lowest priority.<br />
                     <br />
                     Modifiers not used by any of the active combos act as fillers, used to save stash space or to complement
-                    recipes (to hit the cap of 4). You may also lock any of the unused modifiers; <b>archbroski</b> ignores
-                    locked modifiers altogether.
+                    recipes (to hit the zone cap of 4). You may also lock any of the unused modifiers; <b>archbroski</b> ignores
+                    locked modifiers altogether.<br />
+                    <br />
+                    Any changes made are immediately in effect and synchronized to disk.
                 </DialogContentText>
             </DialogContent>
         </Dialog>
@@ -73,7 +75,7 @@ const ComboSettings = ({ userSettings, setUserSettings, modifiers }: ComboSettin
                         <TabPanel value={'catalog'}>
                             <ComboCatalog userSettings={userSettings} setUserSettings={setUserSettings} modifiers={modifiers} />
                         </TabPanel>
-                        <TabPanel value={'roster'}>
+                        <TabPanel value={'roster'} sx={{ pt: 0 }}>
                             <ComboRoster userSettings={userSettings} setUserSettings={setUserSettings} modifiers={modifiers} />
                         </TabPanel>
                     </Box>

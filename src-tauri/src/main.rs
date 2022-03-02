@@ -12,7 +12,7 @@ use crate::logic::suggest_modifier_id;
 use dashmap::DashMap;
 use image::{ProcessImageResult, Rectangle, Vec2};
 use itertools::Itertools;
-use logic::{Hotkey, ModifierId, Modifiers, UserSettings, MODIFIERS};
+use logic::{ModifierId, Modifiers, UserSettings, MODIFIERS};
 use retry::delay::Fixed;
 use retry::retry;
 use scrap::{Capturer, Display};
@@ -23,7 +23,7 @@ use std::ffi::c_void;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::sync::Mutex;
-use tauri::{GlobalShortcutManager, Manager, WindowBuilder};
+use tauri::{AppHandle, GlobalShortcutManager, Manager, WindowBuilder};
 use thiserror::Error;
 use utils::{BincodeDiscSynchronized, DiscSynchronized};
 #[cfg(target_os = "windows")]
@@ -171,6 +171,24 @@ fn create_error_window(app: &tauri::AppHandle) {
         },
     )
     .unwrap();
+}
+
+fn set_initial_hotkey(app: &tauri::AppHandle) {
+    let app_ = app.clone();
+    app.global_shortcut_manager()
+        .register(
+            app.state::<Result<Mutex<UserSettings>, &'static str>>()
+                .as_ref()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .hotkey
+                .as_str(),
+            move || {
+                activate(&app_);
+            },
+        )
+        .unwrap();
 }
 
 fn show_settings_window(app: &tauri::AppHandle) {
@@ -335,17 +353,6 @@ fn activate(app: &tauri::AppHandle) {
     }
 }
 
-fn set_initial_hotkey(app: &tauri::AppHandle) {
-    if let Ok(user_settings) = &*app.state::<Result<Mutex<UserSettings>, &'static str>>() {
-        let app = app.clone();
-        app.global_shortcut_manager()
-            .register(user_settings.lock().unwrap().hotkey.as_str(), move || {
-                activate(&app);
-            })
-            .unwrap();
-    }
-}
-
 #[tauri::command(async)]
 fn get_monitor_size(window: tauri::Window) -> (u32, u32, f64) {
     if let Ok(Some(monitor)) = window.primary_monitor() {
@@ -385,6 +392,7 @@ fn get_user_settings(
 
 #[tauri::command(async)]
 fn set_user_settings(
+    app: AppHandle,
     user_settings_state: tauri::State<'_, Result<Mutex<UserSettings>, &'static str>>,
     user_settings: UserSettings,
 ) {
@@ -392,33 +400,25 @@ fn set_user_settings(
     std::thread::spawn(move || {
         let _ = saved_user_settings.save(); // TODO handle error
     });
-    *user_settings_state.as_ref().unwrap().lock().unwrap() = user_settings;
-}
 
-#[tauri::command(async)]
-fn get_modifiers() -> Modifiers {
-    MODIFIERS.clone()
-}
-
-#[tauri::command(async)]
-fn set_hotkey(
-    app: tauri::AppHandle,
-    user_settings_state: tauri::State<'_, Result<Mutex<UserSettings>, &'static str>>,
-    hotkey: Hotkey,
-) {
-    let user_settings_state = user_settings_state.as_ref().unwrap();
-    let mut user_settings = user_settings_state.lock().unwrap();
-    let accelerator = user_settings.hotkey.as_str();
+    let mut user_settings_guard = user_settings_state.as_ref().unwrap().lock().unwrap();
+    let accelerator = user_settings_guard.hotkey.as_str();
     app.global_shortcut_manager()
         .unregister(accelerator)
         .unwrap();
+
+    *user_settings_guard = user_settings;
+    let accelerator = &user_settings_guard.hotkey;
     app.global_shortcut_manager()
         .register(accelerator, move || {
             activate(&app);
         })
         .unwrap();
+}
 
-    user_settings.hotkey = hotkey;
+#[tauri::command(async)]
+fn get_modifiers() -> Modifiers {
+    MODIFIERS.clone()
 }
 
 #[tauri::command(async)]
@@ -443,7 +443,6 @@ fn main() {
             get_user_settings,
             set_user_settings,
             get_modifiers,
-            set_hotkey,
             hide_overlay_window,
             exit,
         ])

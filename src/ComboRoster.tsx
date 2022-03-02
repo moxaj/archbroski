@@ -20,7 +20,7 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
     };
     const [unusedComboIds, setUnusedComboIds] = React.useState<number[]>(
         userSettings.comboCatalog.map(({ id }) => id).filter(id => !userSettings.comboRoster.includes(id)));
-    const onDragEnd = (userSettings: UserSettings, unusedComboIds: number[], result: DropResult, provided: ResponderProvided) => {
+    const onDragEnd = (result: DropResult) => {
         const { source, destination, draggableId: draggableIdString } = result;
         if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) {
             return;
@@ -29,17 +29,14 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
         let draggedComboId = +draggableIdString;
         if (source.droppableId === 'unused') {
             setUnusedComboIds(unusedComboIds => {
-                console.log(unusedComboIds);
                 const newUnusedComboIds = [...unusedComboIds];
                 newUnusedComboIds.splice(source.index, 1);
-                console.log(newUnusedComboIds);
                 return newUnusedComboIds;
             });
         } else {
             setUserSettings(userSettings => {
                 const newUsedComboIds = [...userSettings!.comboRoster];
                 newUsedComboIds.splice(source.index, 1);
-                console.log(newUsedComboIds);
                 return {
                     ...userSettings!,
                     comboRoster: newUsedComboIds,
@@ -47,20 +44,16 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
             });
         }
 
-        const indexModifier = 0; // source.droppableId === destination.droppableId && source.index < destination.index ? -1 : 0;
         if (destination.droppableId === 'unused') {
             setUnusedComboIds(unusedComboIds => {
-                console.log(unusedComboIds);
                 const newUnusedComboIds = [...unusedComboIds];
-                newUnusedComboIds.splice(destination.index + indexModifier, 0, draggedComboId);
-                console.log(newUnusedComboIds);
+                newUnusedComboIds.splice(destination.index, 0, draggedComboId);
                 return newUnusedComboIds;
             });
         } else {
             setUserSettings(userSettings => {
                 const newUsedComboIds = [...userSettings!.comboRoster];
-                newUsedComboIds.splice(destination.index + indexModifier, 0, draggedComboId);
-                console.log(newUsedComboIds);
+                newUsedComboIds.splice(destination.index, 0, draggedComboId);
                 return {
                     ...userSettings!,
                     comboRoster: newUsedComboIds,
@@ -95,23 +88,23 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
         <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
             <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ width: 1, height: 360, display: 'flex' }}>
-                    <DragDropContext onDragEnd={(result, provided) => { onDragEnd(userSettings, unusedComboIds, result, provided) }}>
+                    <DragDropContext onDragEnd={(result) => { onDragEnd(result) }}>
                         <Box sx={{ flex: 1, height: 1, mx: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                             <Typography variant='body2' sx={{ width: 150, my: 1, textTransform: 'uppercase', textAlign: 'center' }}>
                                 Inactive combos
                             </Typography>
                             <Droppable droppableId='unused'>
-                                {(provided, snapshot) =>
+                                {provided =>
                                     <Box ref={provided.innerRef} {...provided.droppableProps}
-                                        sx={{ width: 150, height: 300, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                        sx={{ width: 150, height: 320, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                                         {
                                             unusedComboIds.map((comboId, comboIndex) => (
                                                 <Draggable key={comboId} draggableId={'' + comboId} index={comboIndex}>
-                                                    {(provided, snapshot) => (
+                                                    {provided => (
                                                         <Chip ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
                                                             size='small'
                                                             label={comboLabel(userSettings.comboCatalog.find(({ id }) => id === comboId)!)}
-                                                            sx={{ width: 150, minHeight: 'min-content', my: 1 }} />
+                                                            sx={{ width: 150, minHeight: 'min-content', my: 0.5 }} />
                                                     )}
                                                 </Draggable>
                                             ))
@@ -127,18 +120,18 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                                 Active combos
                             </Typography>
                             <Droppable droppableId='used'>
-                                {(provided, snapshot) =>
+                                {provided =>
                                     <Box ref={provided.innerRef} {...provided.droppableProps}
-                                        sx={{ width: 150, height: 300, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                        sx={{ width: 150, height: 320, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
                                         {
                                             userSettings.comboRoster.map((comboId, comboIndex) => (
                                                 <Draggable key={comboId} draggableId={'' + comboId} index={comboIndex}>
-                                                    {(provided, snapshot) => (
+                                                    {provided => (
                                                         <Chip ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
                                                             size='small'
                                                             label={comboLabel(userSettings.comboCatalog.find(({ id }) => id === comboId)!)}
-                                                            sx={{ width: 150, minHeight: 'min-content', my: 1 }} />
+                                                            sx={{ width: 150, minHeight: 'min-content', my: 0.5 }} />
                                                     )}
                                                 </Draggable>
                                             ))
