@@ -4,12 +4,12 @@ import { Box, Button, Typography } from '@mui/material';
 import { UserSettings } from './Settings';
 import WithLoading from './WithLoading';
 
-type GeneralPageProps = {
+type GeneralSettingsProps = {
     userSettings: UserSettings;
     setUserSettings: React.Dispatch<React.SetStateAction<UserSettings | undefined>>;
 }
 
-const GeneralPage = ({ userSettings, setUserSettings }: GeneralPageProps) => {
+const GeneralSettings = ({ userSettings, setUserSettings }: GeneralSettingsProps) => {
     const setHotkey = (hotkey: string) => {
         setUserSettings(userSettings => ({
             ...userSettings!,
@@ -88,4 +88,4 @@ const GeneralPage = ({ userSettings, setUserSettings }: GeneralPageProps) => {
     )
 };
 
-export default GeneralPage;
+export default GeneralSettings;

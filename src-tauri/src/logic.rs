@@ -159,30 +159,27 @@ impl Modifiers {
 
 pub type Hotkey = String;
 
+pub type ComboId = u64;
+
 #[derive(Hash, PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LabeledCombo {
-    pub id: u64,
+    pub id: ComboId,
     pub label: String,
-    pub enabled: bool,
     pub combo: Vec<ModifierId>,
 }
 
 impl LabeledCombo {
-    pub fn new(id: u64, label: String, enabled: bool, combo: Vec<ModifierId>) -> Self {
-        Self {
-            id,
-            label,
-            enabled,
-            combo,
-        }
+    pub fn new(id: u64, label: String, combo: Vec<ModifierId>) -> Self {
+        Self { id, label, combo }
     }
 }
 
 #[derive(Hash, PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserSettings {
-    pub labeled_combos: Vec<LabeledCombo>,
+    pub combo_catalog: Vec<LabeledCombo>,
+    pub combo_roster: Vec<ComboId>,
     pub forbidden_modifier_ids: BTreeSet<ModifierId>,
     pub hotkey: String,
 }
@@ -190,11 +187,17 @@ pub struct UserSettings {
 impl UserSettings {
     pub fn get_filler_modifier_ids(&self) -> HashSet<ModifierId> {
         let used_modifier_ids = self
-            .labeled_combos
+            .combo_roster
             .iter()
-            .filter_map(
-                |LabeledCombo { combo, enabled, .. }| if *enabled { Some(combo) } else { None },
-            )
+            .flat_map(|&combo_id| {
+                self.combo_catalog.iter().find_map(|combo| {
+                    if combo.id != combo_id {
+                        None
+                    } else {
+                        Some(&combo.combo)
+                    }
+                })
+            })
             .flat_map(|combo| {
                 combo.iter().flat_map(|modifier_id| {
                     MODIFIERS.components[modifier_id]
@@ -219,11 +222,12 @@ impl UserSettings {
 impl DiscSynchronized for UserSettings {
     fn create_new() -> Self {
         Self {
-            labeled_combos: vec![
-                LabeledCombo::new(0, "All the uniques".to_owned(), true, vec![38, 60, 57, 58]),
-                LabeledCombo::new(1, "I love expedition".to_owned(), true, vec![37, 38, 31, 4]),
-                LabeledCombo::new(2, "$$$".to_owned(), true, vec![61, 62, 57, 59]),
+            combo_catalog: vec![
+                LabeledCombo::new(0, "All the uniques".to_owned(), vec![38, 60, 57, 58]),
+                LabeledCombo::new(1, "I love expedition".to_owned(), vec![37, 38, 31, 4]),
+                LabeledCombo::new(2, "$$$".to_owned(), vec![61, 62, 57, 59]),
             ],
+            combo_roster: vec![],
             forbidden_modifier_ids: collection![52, 56],
             hotkey: "ctrl + d".to_owned(),
         }
@@ -277,22 +281,25 @@ fn get_combo_value(combo: &[ModifierId]) -> f32 {
             })
             .sum::<usize>();
 
-        let mut rewards = modifiers.iter().map(|&modifier| &modifier.rewards).fold(
+        let rewards = modifiers.iter().map(|&modifier| &modifier.rewards).fold(
             HashMap::new(),
             |mut rewards, rewards_| {
                 rewards.extend(rewards_);
                 rewards
             },
         );
-        if let Some(&converted_reward) = effects.iter().fold(None, |converted_reward, &effect| {
-            if let Convert { to } = effect {
-                Some(to)
-            } else {
-                converted_reward
-            }
-        }) {
-            rewards = collection! {converted_reward => rewards.values().sum()}
-        }
+        let rewards = if let Some(&converted_reward) =
+            effects.iter().fold(None, |converted_reward, &effect| {
+                if let Convert { to } = effect {
+                    Some(to)
+                } else {
+                    converted_reward
+                }
+            }) {
+            collection! {converted_reward => rewards.values().sum()}
+        } else {
+            rewards
+        };
 
         value
             + rewards
@@ -382,12 +389,18 @@ pub fn suggest_modifier_id(
             cache.modified = true;
             let time_before = Instant::now();
             user_settings
-                .labeled_combos
+                .combo_roster
                 .iter()
-                .filter_map(
-                    |LabeledCombo { combo, enabled, .. }| if *enabled { Some(combo) } else { None },
-                )
-                .find(|&combo| {
+                .flat_map(|&combo_id| {
+                    user_settings.combo_catalog.iter().find_map(|combo| {
+                        if combo.id != combo_id {
+                            None
+                        } else {
+                            Some(&combo.combo)
+                        }
+                    })
+                })
+                .find(|combo| {
                     (0..queue.len()).all(|index| queue[index] == combo[index])
                         && combo
                             .iter()
@@ -398,15 +411,17 @@ pub fn suggest_modifier_id(
                 .or_else(|| {
                     let filler_modifiers_ids = user_settings.get_filler_modifier_ids();
                     let mut modifier_ids = user_settings
-                        .labeled_combos
+                        .combo_roster
                         .iter()
+                        .flat_map(|&combo_id| {
+                            user_settings
+                                .combo_catalog
+                                .iter()
+                                .find(|combo| combo.id != combo_id)
+                        })
                         .enumerate()
-                        .filter_map(|(combo_index, LabeledCombo { combo, enabled, .. })| {
-                            if *enabled {
-                                Some(((combo_index as f32 + 1.0), combo))
-                            } else {
-                                None
-                            }
+                        .map(|(combo_index, LabeledCombo { combo, .. })| {
+                            ((combo_index as f32 + 1.0), combo)
                         })
                         .flat_map(|(combo_priority, combo)| {
                             combo

@@ -481,12 +481,16 @@ pub fn process_image(cache: &mut Cache, screenshot: Screenshot) -> Option<Proces
         let modifier_ids = cells
             .into_par_iter()
             .map(|cell| {
-                let mut cache = cache_mutex.lock().unwrap();
                 let grayscale = CELL_GROUPS[&cell.tag].lock().unwrap().grayscale;
                 (
                     cell.tag,
                     cell.area,
-                    get_modifier_id(&mut cache, &screenshot_sync, &cell, grayscale),
+                    get_modifier_id(
+                        &mut cache_mutex.lock().unwrap(),
+                        &screenshot_sync,
+                        &cell,
+                        grayscale,
+                    ),
                 )
             })
             .collect::<Vec<_>>();

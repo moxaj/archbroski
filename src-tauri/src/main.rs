@@ -107,7 +107,7 @@ fn create_settings_window(app: &tauri::AppHandle) {
             (
                 window_builder
                     .title("Archbroski")
-                    .inner_size(1300f64, 700f64)
+                    .inner_size(1400f64, 700f64)
                     .decorations(false)
                     .resizable(false)
                     .visible(false)

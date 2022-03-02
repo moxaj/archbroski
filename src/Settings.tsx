@@ -3,8 +3,8 @@ import { window, invoke } from '@tauri-apps/api';
 import { AppBar, Box, IconButton, Toolbar, Typography, Tab, Tabs } from '@mui/material';
 import { Minimize } from '@mui/icons-material';
 import { TabContext, TabPanel } from '@mui/lab';
-import GeneralPage from './GeneralPage';
-import CombosPage from './CombosPage';
+import GeneralSettings from './GeneralSettings';
+import ComboSettings from './ComboSettings';
 import AboutPage from './AboutPage';
 import WithLoading from './WithLoading';
 
@@ -22,12 +22,12 @@ export type Modifiers = {
 export type LabeledCombo = {
     id: number,
     label: string,
-    enabled: boolean;
     combo: number[];
 }
 
 export type UserSettings = {
-    labeledCombos: LabeledCombo[];
+    comboCatalog: LabeledCombo[];
+    comboRoster: number[];
     forbiddenModifierIds: number[];
     hotkey: string;
 };
@@ -58,7 +58,7 @@ const Settings = () => {
             invoke('set_user_settings', {
                 userSettings: {
                     ...userSettings,
-                    combos: userSettings.labeledCombos.filter(({ combo }) => new Set(combo).size === combo.length)
+                    combos: userSettings.comboCatalog.filter(({ combo }) => new Set(combo).size === combo.length)
                 }
             }).catch(console.error);
         }, 500);
@@ -94,10 +94,10 @@ const Settings = () => {
                         </Box>
                         <Box sx={{ flexGrow: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
                             <TabPanel value={'general'} sx={{ width: 1, height: 1 }}>
-                                <GeneralPage userSettings={userSettings!} setUserSettings={setUserSettings} />
+                                <GeneralSettings userSettings={userSettings!} setUserSettings={setUserSettings} />
                             </TabPanel>
-                            <TabPanel value={'combos'} sx={{ width: 1, height: 1 }}>
-                                <CombosPage userSettings={userSettings!} setUserSettings={setUserSettings} modifiers={modifiers!} />
+                            <TabPanel value={'combos'} sx={{ width: 1, height: 1, p: 0 }}>
+                                <ComboSettings userSettings={userSettings!} setUserSettings={setUserSettings} modifiers={modifiers!} />
                             </TabPanel>
                             <TabPanel value={'about'} sx={{ width: 1, height: 1 }}>
                                 <AboutPage />
