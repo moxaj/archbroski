@@ -2,15 +2,15 @@
 
 __archbroski__ is a 3rd party tool for Path of Exile which suggests archnemesis modifiers to use according to your preferences.
 
-## 1. Installation
+## Installation
 
 Install the program using the installer downloaded from [here](https://www.google.com).
 
-## 2. Configuration
+## Configuration
 
 After running the program, right click on the system tray icon and click `Settings`. Set up your configuration hotkey and combos. You may change these any time, and any changes made are immediately in effect and synced to your local filesystem.
 
-## 3. Usage
+## Usage
 
 Approach an archnemesis status and click its icon. Once the UI is visible, press your activation hotkey, and, if everything goes well,
 a single modifier should be highlighted. Press any key to hide the overlay and use that modifier!
@@ -28,6 +28,21 @@ the image recognition is __very likely to fail__ (fail to recognize the layout o
 > 5. would the activation fail, a red exclamation point indicates that the image recognition failed, while a red question mark indicates that the system could not select
 a modifier to use (for whatever reason)
 
-## 4. Having issues?
+## Having issues?
 
 Don't be shy, just file an issue [here](https://github.com/moxaj/archbroski/issues). Also, if you are a seasoned rust or react dev, feel free to provide any feedback regarding the implementation.
+
+## License
+
+<sup>
+Licensed under either of <a href="LICENSE-APACHE">Apache License, Version
+2.0</a> or <a href="LICENSE-MIT">MIT license</a> at your option.
+</sup>
+
+<br>
+
+<sub>
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in this crate by you, as defined in the Apache-2.0 license, shall
+be dual licensed as above, without any additional terms or conditions.
+</sub>
