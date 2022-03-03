@@ -1,5 +1,4 @@
 import React from 'react';
-import { invoke } from '@tauri-apps/api';
 import { Box, Button, Typography } from '@mui/material';
 import { UserSettings } from './Settings';
 import WithLoading from './WithLoading';
@@ -53,7 +52,7 @@ const GeneralSettings = ({ userSettings, setUserSettings }: GeneralSettingsProps
         return () => {
             document.removeEventListener('keydown', keydownListener);
         };
-    }, [recordingHotkey]);
+    }, [recordingHotkey, setUserSettings]);
     return (
         <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
             <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>

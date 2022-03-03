@@ -124,7 +124,7 @@ const ComboCatalog = ({ userSettings, setUserSettings, modifiers }: ComboCatalog
         <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
             <Box sx={{ width: 1, height: 1 }}>
                 <DeleteComboDialog combo={comboToDelete} open={deleteComboDialogOpen} onClose={confirmed => confirmDeleteCombo(comboToDelete?.id!, confirmed ?? false)} />
-                <TableContainer sx={{ width: 1, height: 525, overflow: 'overlay' }}>
+                <TableContainer sx={{ width: 1, height: 550, overflow: 'overlay' }}>
                     <Table>
                         <TableHead>
                             <TableRow>

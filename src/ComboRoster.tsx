@@ -1,26 +1,59 @@
 import React from "react";
 import { TransitionGroup } from "react-transition-group";
 import { Lock } from "@mui/icons-material";
-import { Box, Typography, Grow, Fade, Chip, Divider } from "@mui/material";
+import { Box, Typography, Chip, Divider, Zoom } from "@mui/material";
 import { UserSettings, Modifiers, LabeledCombo } from "./Settings";
 import WithLoading from "./WithLoading";
 import { numberKeys } from ".";
-import { DragDropContext, Droppable, Draggable, DropResult, ResponderProvided } from "react-beautiful-dnd";
+import { DragDropContext, Droppable, Draggable, DropResult, DragStart } from "react-beautiful-dnd";
 
 type ComboRosterProps = {
     userSettings: UserSettings;
     setUserSettings: React.Dispatch<React.SetStateAction<UserSettings | undefined>>;
     modifiers: Modifiers;
 };
+const comboLabel = ({ label, id }: LabeledCombo) => {
+    return label !== ''
+        ? label
+        : `Unnamed #${id}`;
+};
+const getUsedModifierIds = (modifiers: Modifiers, modifierId: number): number[] =>
+    [modifierId, ...modifiers.byId[modifierId].recipe.flatMap(modifierId_ => getUsedModifierIds(modifiers, modifierId_))];
 const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterProps) => {
-    const comboLabel = ({ label, id }: LabeledCombo) => {
-        return label !== ''
-            ? label
-            : `Unnamed #${id}`;
+    const toggleForbiddenModifierId = (modifierId: number) => {
+        setUserSettings(userSettings => {
+            const forbiddenModifierIds = userSettings!.forbiddenModifierIds;
+            return {
+                ...userSettings!,
+                forbiddenModifierIds: forbiddenModifierIds.includes(modifierId)
+                    ? forbiddenModifierIds.filter(modifierId_ => modifierId_ !== modifierId)
+                    : [...forbiddenModifierIds, modifierId]
+            }
+        });
     };
     const [unusedComboIds, setUnusedComboIds] = React.useState<number[]>(
         userSettings.comboCatalog.map(({ id }) => id).filter(id => !userSettings.comboRoster.includes(id)));
+    const [draggedComboId, setDraggedComboId] = React.useState<number | undefined>(undefined);
+    const unusedModifierIds = React.useMemo(() => {
+        let usedModifierIds = new Set(userSettings.comboRoster.flatMap(comboId =>
+            userSettings.comboCatalog.find(({ id }) => id === comboId)?.combo.flatMap(modifierId => getUsedModifierIds(modifiers, modifierId)) ?? []));
+        let unusedModifierIds = numberKeys(modifiers.byId)
+            .filter(modifierId => !usedModifierIds.has(modifierId))
+            .map(modifierId => modifiers.byId[modifierId])
+            .sort((modifier1, modifier2) => modifier1.name.localeCompare(modifier2.name))
+            .map(modifier => modifier.id);
+        return unusedModifierIds;
+    }, [modifiers, userSettings]);
+    const modifierIdsUsedByDragged = React.useMemo(() => {
+        return new Set(draggedComboId === undefined ? [] : userSettings.comboCatalog
+            .find(({ id }) => id === draggedComboId)
+            ?.combo.flatMap(modifierId => getUsedModifierIds(modifiers, modifierId)));
+    }, [modifiers, userSettings, draggedComboId]);
+    const onDragStart = (result: DragStart) => {
+        setDraggedComboId(+result.draggableId);
+    };
     const onDragEnd = (result: DropResult) => {
+        setDraggedComboId(undefined);
         const { source, destination, draggableId: draggableIdString } = result;
         if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) {
             return;
@@ -61,34 +94,18 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
             });
         }
     };
-    const toggleForbiddenModifierId = (modifierId: number) => {
-        setUserSettings(userSettings => {
-            const forbiddenModifierIds = userSettings!.forbiddenModifierIds;
-            return {
-                ...userSettings!,
-                forbiddenModifierIds: forbiddenModifierIds.includes(modifierId)
-                    ? forbiddenModifierIds.filter(modifierId_ => modifierId_ !== modifierId)
-                    : [...forbiddenModifierIds, modifierId]
-            }
-        });
+    const unusedModifierIdOpacity = (draggedComboId: number | undefined, modifierId: number, modifierIdsUsedByDragged: Set<number>) => {
+        return draggedComboId === undefined
+            ? 1
+            : modifierIdsUsedByDragged.has(modifierId)
+                ? 0.2
+                : 1;
     };
-    const unusedModifierIds = React.useMemo(() => {
-        const getUsedModifierIds = (modifierId: number): number[] =>
-            [modifierId, ...modifiers.byId[modifierId].recipe.flatMap(getUsedModifierIds)];
-        let usedModifierIds = new Set(userSettings.comboRoster.flatMap(comboId =>
-            userSettings.comboCatalog.find(({ id }) => id === comboId)?.combo.flatMap(getUsedModifierIds) ?? []));
-        let unusedModifierIds = numberKeys(modifiers.byId)
-            .filter(modifierId => !usedModifierIds.has(modifierId))
-            .map(modifierId => modifiers.byId[modifierId])
-            .sort((modifier1, modifier2) => modifier1.name.localeCompare(modifier2.name))
-            .map(modifier => modifier.id);
-        return unusedModifierIds;
-    }, [modifiers, userSettings]);
     return (
         <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
             <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ width: 1, height: 360, display: 'flex' }}>
-                    <DragDropContext onDragEnd={(result) => { onDragEnd(result) }}>
+                    <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
                         <Box sx={{ flex: 1, height: 1, mx: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                             <Typography variant='body2' sx={{ width: 150, my: 1, textTransform: 'uppercase', textAlign: 'center' }}>
                                 Inactive combos
@@ -156,18 +173,28 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                             {unusedModifierIds.map(modifierId => {
                                 let modifier = modifiers.byId[modifierId];
                                 return (
-                                    <Grow key={modifier.name}>
+                                    <Zoom key={modifier.name}>
                                         <Box sx={{ position: 'relative' }}>
-                                            <Fade in={userSettings!.forbiddenModifierIds.includes(modifierId)}>
-                                                <Lock sx={{
-                                                    position: 'absolute', right: 0, top: 0, fontSize: '14px',
-                                                    transform: 'translateX(20%)'
-                                                }} />
-                                            </Fade>
-                                            <Chip size='small' label={modifier.name} sx={{ m: 0.3 }}
-                                                onClick={() => { toggleForbiddenModifierId(modifierId) }} />
+                                            <Box sx={{
+                                                transition: (theme) => theme.transitions.create(['opacity', 'transform']),
+                                                opacity: unusedModifierIdOpacity(draggedComboId, modifierId, modifierIdsUsedByDragged)
+                                            }}>
+                                                <Zoom in={userSettings!.forbiddenModifierIds.includes(modifierId)}>
+                                                    <Lock sx={{
+                                                        position: 'absolute', right: 0, top: 0, fontSize: '14px',
+                                                        transform: 'translateX(20%)'
+                                                    }} />
+                                                </Zoom>
+                                                <Chip
+                                                    size='small'
+                                                    label={modifier.name}
+                                                    sx={{
+                                                        m: 0.3
+                                                    }}
+                                                    onClick={() => { toggleForbiddenModifierId(modifierId) }} />
+                                            </Box>
                                         </Box>
-                                    </Grow>
+                                    </Zoom>
                                 );
                             })}
                         </TransitionGroup>

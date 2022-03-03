@@ -10,6 +10,8 @@ Install the program using the installer downloaded from [here](https://www.googl
 
 After running the program, right click on the system tray icon and click `Settings`. Set up your configuration hotkey and combos. You may change these any time, and any changes made are immediately in effect and synced to your local filesystem.
 
+Hotkey support is rather limited, ctrl / alt / shift + a-z, 0-9, F1-12.
+
 ## Usage
 
 Approach an archnemesis status and click its icon. Once the UI is visible, press your activation hotkey, and, if everything goes well, a single modifier should be highlighted. Press any key to hide the overlay and use that modifier!
