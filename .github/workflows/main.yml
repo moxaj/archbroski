@@ -10,8 +10,11 @@ jobs:
       fail-fast: false
       matrix:
         platform: [windows-latest]
-
     runs-on: ${{ matrix.platform }}
+    env:
+      OPENCV_INCLUDE_PATHS: ${{ github.workspace }}/opencv/include
+      OPENCV_LINK_PATHS: ${{ github.workspace }}/opencv/lib
+      OPENCV_LINK_LIBS: opencv_world455
     steps:
     - uses: actions/checkout@v2
     - name: setup node
