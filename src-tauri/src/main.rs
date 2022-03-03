@@ -254,7 +254,12 @@ fn activate(app: &tauri::AppHandle) {
                          stash_modifier_ids,
                          queue_modifier_ids,
                      }| {
-                        if queue_modifier_ids.len() == 4 {
+                        if queue_modifier_ids
+                            .iter()
+                            .filter(|&&modifier_id| modifier_id.is_some())
+                            .count()
+                            == 4
+                        {
                             Err(ActivationError::LogicError)
                         } else {
                             let stash_by_modifier_ids = stash_modifier_ids.iter().fold(
