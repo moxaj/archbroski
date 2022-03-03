@@ -201,22 +201,21 @@ fn show_settings_window(app: &tauri::AppHandle) {
 }
 
 fn activate(app: &tauri::AppHandle) {
-    if let Ok(mut activation_state_guard) = app.state::<Mutex<(u64, ActivationState)>>().try_lock()
-    {
-        if !matches!(activation_state_guard.1, ActivationState::Hidden) {
+    if let Ok(mut activation_state) = app.state::<Mutex<(u64, ActivationState)>>().try_lock() {
+        if !matches!(activation_state.1, ActivationState::Hidden) {
             return;
         }
 
-        activation_state_guard.0 += 1;
-        activation_state_guard.1 = ActivationState::Computing {
-            id: activation_state_guard.0,
+        activation_state.0 += 1;
+        activation_state.1 = ActivationState::Computing {
+            id: activation_state.0,
         };
-        let activation_id = activation_state_guard.0;
+        let activation_id = activation_state.0;
         app.get_window("overlay")
             .unwrap()
-            .emit("update", activation_state_guard.1)
+            .emit("update", activation_state.1)
             .unwrap();
-        drop(activation_state_guard);
+        drop(activation_state);
 
         let app = app.clone();
         std::thread::spawn(move || {
@@ -258,7 +257,6 @@ fn activate(app: &tauri::AppHandle) {
                          stash_area,
                          stash_modifier_ids,
                          queue_modifier_ids,
-                         ..
                      }| {
                         let stash_by_modifier_ids = stash_modifier_ids.iter().fold(
                             HashMap::<ModifierId, BTreeSet<Rectangle>>::new(),
@@ -275,18 +273,15 @@ fn activate(app: &tauri::AppHandle) {
                         );
 
                         let cache_state = app.state::<Result<Mutex<Cache>, &'static str>>();
-                        let cache_state = cache_state.as_ref();
-                        let mut cache = cache_state.unwrap().lock().unwrap();
+                        let mut cache = cache_state.as_ref().unwrap().lock().unwrap();
 
                         let user_settings_state =
                             app.state::<Result<Mutex<UserSettings>, &'static str>>();
-                        let user_settings_state = user_settings_state.as_ref();
-                        let user_settings = &mut *user_settings_state.unwrap().lock().unwrap();
                         timed!(
                             "logic",
                             suggest_modifier_id(
                                 &mut cache,
-                                user_settings,
+                                &user_settings_state.as_ref().unwrap().lock().unwrap(),
                                 stash_modifier_ids
                                     .values()
                                     .filter_map(|modifier_id| modifier_id.as_ref())
@@ -305,6 +300,7 @@ fn activate(app: &tauri::AppHandle) {
                         .and_then(|suggested_modifier_id| {
                             if cache.modified {
                                 cache.save().map_err(|_| ActivationError::DetectionError)?;
+                                // TODO handle error
                             }
 
                             Ok(suggested_modifier_id)
@@ -318,15 +314,16 @@ fn activate(app: &tauri::AppHandle) {
 
                             let activation_state_state =
                                 app.state::<Mutex<(u64, ActivationState)>>();
-                            let mut activation_state_guard = activation_state_state.lock().unwrap();
-                            if let ActivationState::Computing { id } = activation_state_guard.1 {
+                            let mut activation_state = activation_state_state.lock().unwrap();
+                            if let ActivationState::Computing { id } = activation_state.1 {
                                 if id == activation_id {
-                                    activation_state_guard.1 = ActivationState::Computed(
-                                        Highlight::new(stash_area, suggested_cell_area),
-                                    );
+                                    activation_state.1 = ActivationState::Computed(Highlight::new(
+                                        stash_area,
+                                        suggested_cell_area,
+                                    ));
                                     app.get_window("overlay")
                                         .unwrap()
-                                        .emit("update", activation_state_guard.1)
+                                        .emit("update", activation_state.1)
                                         .unwrap();
                                 }
                             }
@@ -335,16 +332,16 @@ fn activate(app: &tauri::AppHandle) {
                 )
             {
                 let activation_state_state = app.state::<Mutex<(u64, ActivationState)>>();
-                let mut activation_state_guard = activation_state_state.lock().unwrap();
-                if let ActivationState::Computing { id } = activation_state_guard.1 {
+                let mut activation_state = activation_state_state.lock().unwrap();
+                if let ActivationState::Computing { id } = activation_state.1 {
                     if id == activation_id {
-                        activation_state_guard.1 = match error {
+                        activation_state.1 = match error {
                             ActivationError::DetectionError => ActivationState::DetectionError,
                             ActivationError::LogicError => ActivationState::LogicError,
                         };
                         app.get_window("overlay")
                             .unwrap()
-                            .emit("update", activation_state_guard.1)
+                            .emit("update", activation_state.1)
                             .unwrap();
                     }
                 }

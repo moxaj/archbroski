@@ -12,8 +12,7 @@ After running the program, right click on the system tray icon and click `Settin
 
 ## Usage
 
-Approach an archnemesis status and click its icon. Once the UI is visible, press your activation hotkey, and, if everything goes well,
-a single modifier should be highlighted. Press any key to hide the overlay and use that modifier!
+Approach an archnemesis status and click its icon. Once the UI is visible, press your activation hotkey, and, if everything goes well, a single modifier should be highlighted. Press any key to hide the overlay and use that modifier!
 
 > __IMPORTANT__
 > 
@@ -25,8 +24,7 @@ a single modifier should be highlighted. Press any key to hide the overlay and u
 > 3. if, for any reason, your UI differs in size, or you use anything akin to Reshade, SweetFX, NVIDIA Freestyle, etc.,
 the image recognition is __very likely to fail__ (fail to recognize the layout or misidentify the modifiers)
 > 4. the initial activation may take a few seconds, but subsequent activations should be reasonably fast (< 100ms)
-> 5. would the activation fail, a red exclamation point indicates that the image recognition failed, while a red question mark indicates that the system could not select
-a modifier to use (for whatever reason)
+> 5. would the activation fail, a red exclamation point indicates that the image recognition failed, while a red question mark indicates that the system could not select a modifier to use (for whatever reason)
 
 ## Having issues?
 
