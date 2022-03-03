@@ -30,7 +30,7 @@ the image recognition is __very likely to fail__ (fail to recognize the layout o
 
 ## Having issues?
 
-Don't be shy, just file an issue [here](https://github.com/moxaj/archbroski/issues). Also, if you are a seasoned rust or react dev, feel free to provide any feedback regarding the implementation.
+Report [here](https://github.com/moxaj/archbroski/issues).
 
 ## License
 
