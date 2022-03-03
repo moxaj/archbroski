@@ -1,0 +1,7 @@
+{
+  "name": "archbroski",
+  "version-string": "0.0.1",
+  "dependencies": [
+    "llvm", "opencv4[contrib,nonfree]"
+  ]
+}
