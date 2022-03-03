@@ -37,7 +37,7 @@ pub struct Cache {
     pub modified: bool,
     pub layout: Option<HashMap<u8, Vec2>>,
     pub images: DashMap<u64, Option<ModifierId>>,
-    pub suggested_modifier_ids: HashMap<u64, Option<ModifierId>>,
+    pub suggested_modifier_ids: HashMap<(u128, u64), Option<ModifierId>>,
 }
 
 impl DiscSynchronized for Cache {

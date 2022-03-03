@@ -42,10 +42,12 @@ pub trait DiscSynchronized: Sized + Serialize + DeserializeOwned {
     fn load_impl(reader: BufReader<File>) -> Result<Self, Box<dyn Error>>;
 
     fn output_path() -> Result<PathBuf, Box<dyn Error>> {
-        let mut path = config_dir()
-            .ok_or_else(|| IOError::new(ErrorKind::Other, "Cannot find home directory."))?;
-        path.push(PathBuf::from(Self::file_name()));
-        Ok(path)
+        config_dir()
+            .ok_or_else(|| "Cannot find home directory.".into())
+            .map(|mut path| {
+                path.push(PathBuf::from(Self::file_name()));
+                path
+            })
     }
 
     fn save(&self) -> Result<(), Box<dyn Error>> {

@@ -10,7 +10,7 @@ use std::error::Error;
 use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::io::BufReader;
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 use Effect::*;
 use Reward::*;
 
@@ -380,8 +380,13 @@ pub fn suggest_modifier_id(
 ) -> Option<ModifierId> {
     let mut hasher = DefaultHasher::new();
     (user_settings.clone(), stash.clone(), queue.clone()).hash(&mut hasher);
-    let cache_key = hasher.finish();
-
+    let cache_key = (
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos(),
+        hasher.finish(),
+    );
     *cache
         .suggested_modifier_ids
         .entry(cache_key)
@@ -484,7 +489,7 @@ pub fn suggest_modifier_id(
                                 .collect_vec()
                         })
                         .map(|(modifier_id, combo_priority, modifier_priority)| {
-                            (modifier_id, (combo_priority * modifier_priority))
+                            (modifier_id, combo_priority + modifier_priority)
                         })
                         .sorted_by(|&(_, priority1), &(_, priority2)| {
                             priority1.partial_cmp(&priority2).unwrap_or(Equal)
