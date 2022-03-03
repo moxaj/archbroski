@@ -1,4 +1,4 @@
-import { Box, Fade, CircularProgress, SxProps, Theme } from "@mui/material";
+import { Box, Fade, CircularProgress, SxProps, Theme } from '@mui/material';
 
 export type LoadedProps = {
     loaded: boolean;

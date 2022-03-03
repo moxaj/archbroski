@@ -1,10 +1,10 @@
-import React from "react";
-import { Delete, Add, Error } from "@mui/icons-material";
-import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, TextField, Select, MenuItem, Typography, Box, IconButton, Tooltip, Zoom, Fade } from "@mui/material";
-import { numberKeys } from ".";
-import { LabeledCombo, UserSettings, Modifiers } from "./Settings";
-import WithLoading from "./WithLoading";
-import { DialogTransition } from "./ComboSettings";
+import React from 'react';
+import { Delete, Add, Error } from '@mui/icons-material';
+import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, TextField, Select, MenuItem, Typography, Box, IconButton, Tooltip, Zoom, Fade } from '@mui/material';
+import { numberKeys } from '.';
+import { LabeledCombo, UserSettings, Modifiers } from './Settings';
+import WithLoading from './WithLoading';
+import { DialogTransition } from './ComboSettings';
 
 type DeleteComboDialogProps = {
     combo?: LabeledCombo;
@@ -177,8 +177,8 @@ const ComboCatalog = ({ userSettings, setUserSettings, modifiers }: ComboCatalog
                                                     <Zoom
                                                         in={!isComboValid(combo)}
                                                         easing={{
-                                                            enter: "cubic-bezier(0.800, 1.000, 0.500, 2.000)",
-                                                            exit: "linear"
+                                                            enter: 'cubic-bezier(0.800, 1.000, 0.500, 2.000)',
+                                                            exit: 'linear'
                                                         }}
                                                         timeout={250}>
                                                         <Error color='error' sx={{ mr: 2 }} />
