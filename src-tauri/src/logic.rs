@@ -380,9 +380,11 @@ pub fn suggest_modifier_id(
 ) -> Option<ModifierId> {
     let mut hasher = DefaultHasher::new();
     (user_settings.clone(), stash.clone(), queue.clone()).hash(&mut hasher);
+    let cache_key = hasher.finish();
+
     *cache
         .suggested_modifier_ids
-        .entry(hasher.finish())
+        .entry(cache_key)
         .or_insert_with(|| {
             cache.modified = true;
             let time_before = Instant::now();

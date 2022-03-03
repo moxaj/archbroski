@@ -236,21 +236,17 @@ fn activate(app: &tauri::AppHandle) {
                 })
                 .and_then(|(buffer, width, height)| {
                     let cache_state = app.state::<Result<Mutex<Cache>, &'static str>>();
-                    let cache_state = cache_state.as_ref();
-                    let mut cache = cache_state.unwrap().lock().unwrap();
+                    let mut cache = cache_state.as_ref().unwrap().lock().unwrap();
                     cache.modified = false;
-                    timed!(
-                        "process_image",
-                        process_image(
-                            &mut cache,
-                            Screenshot {
-                                buffer,
-                                width,
-                                height
-                            },
-                        )
+                    process_image(
+                        &mut cache,
+                        Screenshot {
+                            buffer,
+                            width,
+                            height,
+                        },
                     )
-                    .ok_or_else(|| ActivationError::DetectionError)
+                    .ok_or(ActivationError::DetectionError)
                 })
                 .and_then(
                     |ProcessImageResult {
@@ -258,76 +254,79 @@ fn activate(app: &tauri::AppHandle) {
                          stash_modifier_ids,
                          queue_modifier_ids,
                      }| {
-                        let stash_by_modifier_ids = stash_modifier_ids.iter().fold(
-                            HashMap::<ModifierId, BTreeSet<Rectangle>>::new(),
-                            |mut stash_by_modifier_ids, (&cell_area, &modifier_id)| {
-                                if let Some(modifier_id) = modifier_id {
+                        if queue_modifier_ids.len() == 4 {
+                            Err(ActivationError::LogicError)
+                        } else {
+                            let stash_by_modifier_ids = stash_modifier_ids.iter().fold(
+                                HashMap::<ModifierId, BTreeSet<Rectangle>>::new(),
+                                |mut stash_by_modifier_ids, (&cell_area, &modifier_id)| {
+                                    if let Some(modifier_id) = modifier_id {
+                                        stash_by_modifier_ids
+                                            .entry(modifier_id)
+                                            .or_default()
+                                            .insert(cell_area);
+                                    }
+
                                     stash_by_modifier_ids
-                                        .entry(modifier_id)
-                                        .or_default()
-                                        .insert(cell_area);
-                                }
+                                },
+                            );
 
-                                stash_by_modifier_ids
-                            },
-                        );
+                            let cache_state = app.state::<Result<Mutex<Cache>, &'static str>>();
+                            let mut cache = cache_state.as_ref().unwrap().lock().unwrap();
 
-                        let cache_state = app.state::<Result<Mutex<Cache>, &'static str>>();
-                        let mut cache = cache_state.as_ref().unwrap().lock().unwrap();
-
-                        let user_settings_state =
-                            app.state::<Result<Mutex<UserSettings>, &'static str>>();
-                        timed!(
-                            "logic",
-                            suggest_modifier_id(
-                                &mut cache,
-                                &user_settings_state.as_ref().unwrap().lock().unwrap(),
-                                stash_modifier_ids
-                                    .values()
-                                    .filter_map(|modifier_id| modifier_id.as_ref())
-                                    .copied()
-                                    .counts()
-                                    .into_iter()
-                                    .collect(),
-                                queue_modifier_ids
-                                    .iter()
-                                    .filter_map(|modifier_id| modifier_id.as_ref())
-                                    .copied()
-                                    .collect_vec()
+                            let user_settings_state =
+                                app.state::<Result<Mutex<UserSettings>, &'static str>>();
+                            timed!(
+                                "suggest modifier id",
+                                suggest_modifier_id(
+                                    &mut cache,
+                                    &user_settings_state.as_ref().unwrap().lock().unwrap(),
+                                    stash_modifier_ids
+                                        .values()
+                                        .filter_map(|modifier_id| modifier_id.as_ref())
+                                        .copied()
+                                        .counts()
+                                        .into_iter()
+                                        .collect(),
+                                    queue_modifier_ids
+                                        .iter()
+                                        .filter_map(|modifier_id| modifier_id.as_ref())
+                                        .copied()
+                                        .collect_vec()
+                                )
                             )
-                        )
-                        .ok_or_else(|| ActivationError::LogicError)
-                        .and_then(|suggested_modifier_id| {
-                            if cache.modified {
-                                cache.save().map_err(|_| ActivationError::DetectionError)?;
-                                // TODO handle error
-                            }
-
-                            Ok(suggested_modifier_id)
-                        })
-                        .map(|suggested_modifier_id| {
-                            let suggested_cell_area = *stash_by_modifier_ids
-                                [&suggested_modifier_id]
-                                .iter()
-                                .next()
-                                .unwrap();
-
-                            let activation_state_state =
-                                app.state::<Mutex<(u64, ActivationState)>>();
-                            let mut activation_state = activation_state_state.lock().unwrap();
-                            if let ActivationState::Computing { id } = activation_state.1 {
-                                if id == activation_id {
-                                    activation_state.1 = ActivationState::Computed(Highlight::new(
-                                        stash_area,
-                                        suggested_cell_area,
-                                    ));
-                                    app.get_window("overlay")
-                                        .unwrap()
-                                        .emit("update", activation_state.1)
-                                        .unwrap();
+                            .ok_or_else(|| ActivationError::LogicError)
+                            .and_then(|suggested_modifier_id| {
+                                if cache.modified {
+                                    cache.save().map_err(|_| ActivationError::DetectionError)?;
+                                    // TODO handle error
                                 }
-                            }
-                        })
+
+                                Ok(suggested_modifier_id)
+                            })
+                            .map(|suggested_modifier_id| {
+                                let suggested_cell_area = *stash_by_modifier_ids
+                                    [&suggested_modifier_id]
+                                    .iter()
+                                    .next()
+                                    .unwrap();
+
+                                let activation_state_state =
+                                    app.state::<Mutex<(u64, ActivationState)>>();
+                                let mut activation_state = activation_state_state.lock().unwrap();
+                                if let ActivationState::Computing { id } = activation_state.1 {
+                                    if id == activation_id {
+                                        activation_state.1 = ActivationState::Computed(
+                                            Highlight::new(stash_area, suggested_cell_area),
+                                        );
+                                        app.get_window("overlay")
+                                            .unwrap()
+                                            .emit("update", activation_state.1)
+                                            .unwrap();
+                                    }
+                                }
+                            })
+                        }
                     },
                 )
             {
