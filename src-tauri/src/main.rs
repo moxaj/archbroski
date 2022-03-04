@@ -37,7 +37,7 @@ pub struct Cache {
     pub modified: bool,
     pub layout: Option<HashMap<u8, Vec2>>,
     pub images: DashMap<u64, Option<ModifierId>>,
-    pub suggested_modifier_ids: HashMap<(u128, u64), Option<ModifierId>>,
+    pub suggested_modifier_ids: HashMap<u64, Option<ModifierId>>,
 }
 
 impl DiscSynchronized for Cache {
@@ -66,12 +66,13 @@ impl DiscSynchronized for Cache {
 impl BincodeDiscSynchronized for Cache {}
 
 #[derive(Clone, Copy, Debug, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type")]
 enum ActivationState {
     Hidden,
     Computing {
         id: u64,
     },
+    #[serde(rename_all = "camelCase")]
     Computed {
         stash_area: Rectangle,
         suggested_cell_area: Rectangle,
