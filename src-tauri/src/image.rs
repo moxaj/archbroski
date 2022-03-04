@@ -393,14 +393,18 @@ fn get_layout(cache: &mut Cache, screenshot: &Mat) -> Option<HashMap<u8, Vec2>> 
                 None
             } else {
                 cache.modified = true;
+
                 Some(layout)
             }
         } {
             cache.layout = Some(layout);
+            cache.layout.clone()
+        } else {
+            None
         }
+    } else {
+        cache.layout.clone()
     }
-
-    cache.layout.clone()
 }
 
 fn get_cells(layout: &HashMap<u8, Vec2>) -> Vec<Cell> {
