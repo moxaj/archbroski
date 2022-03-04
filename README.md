@@ -17,7 +17,7 @@ Hotkey support is rather limited, `ctrl` / `alt` / `shift` + `a-z`, `0-9`, `F1-1
 Approach an archnemesis statue and click its icon. Once the UI is visible, press your activation hotkey. Then, one of 3 things could happen:
  - __a__, a single modifier is highlighted and a __green checkmark__ pops up. Simply use that modifier.
  - __b__, the image recognition algorithm fails, indicated by a __red explamation point__. For why this might have happened, read through the `IMPORTANT` points below
- - __c__, the logic algorithm fails, indicated by a __red question mark__. Read [this section](logic-algorithm) to understand why this might have happened.
+ - __c__, the logic algorithm fails, indicated by a __red question mark__. Read [this section](#logic-algorithm) to understand why this might have happened.
 
 Whatever happens, you can close the overlay by pressing any key or mouse button. Also, the very first activation after installation could take a few seconds,
 but subsequent activations should (eventually) be reasonably fast (< 100ms).
