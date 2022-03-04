@@ -353,32 +353,30 @@ fn match_template(source: &Mat, template: &Mat) -> (Vec2, f32) {
 }
 
 fn get_layout(cache: &mut Cache, screenshot: &Mat) -> Option<HashMap<u8, Vec2>> {
-    cache.layout = cache
-        .layout
-        .take()
-        .filter(|layout| {
-            CELL_GROUPS.iter().all(|(&tag, cell_group)| {
-                let cell_group = cell_group.lock().unwrap();
-                let cell_group_offset = layout[&tag];
-                let cell_group_template_size = cell_group.template.size().unwrap();
-                let source = Mat::rowscols(
-                    screenshot,
-                    &Range::new(
-                        cell_group_offset.y as i32,
-                        cell_group_offset.y as i32 + cell_group_template_size.height,
-                    )
-                    .unwrap(),
-                    &Range::new(
-                        cell_group_offset.x as i32,
-                        cell_group_offset.x as i32 + cell_group_template_size.width,
-                    )
-                    .unwrap(),
+    let layout_matches = |layout: &&HashMap<u8, Vec2>| {
+        CELL_GROUPS.iter().all(|(&tag, cell_group)| {
+            let cell_group = cell_group.lock().unwrap();
+            let cell_group_offset = layout[&tag];
+            let cell_group_template_size = cell_group.template.size().unwrap();
+            let source = Mat::rowscols(
+                screenshot,
+                &Range::new(
+                    cell_group_offset.y as i32,
+                    cell_group_offset.y as i32 + cell_group_template_size.height,
                 )
-                .unwrap();
-                match_template(&source, &cell_group.template).1 > 0.95
-            })
+                .unwrap(),
+                &Range::new(
+                    cell_group_offset.x as i32,
+                    cell_group_offset.x as i32 + cell_group_template_size.width,
+                )
+                .unwrap(),
+            )
+            .unwrap();
+            match_template(&source, &cell_group.template).1 > 0.95
         })
-        .or_else(|| {
+    };
+    if cache.layout.as_ref().filter(layout_matches).is_none() {
+        if let Some(layout) = {
             let layout: HashMap<_, _> = CELL_GROUPS
                 .iter()
                 .filter_map(|(&tag, cell_group)| {
@@ -397,7 +395,11 @@ fn get_layout(cache: &mut Cache, screenshot: &Mat) -> Option<HashMap<u8, Vec2>> 
                 cache.modified = true;
                 Some(layout)
             }
-        });
+        } {
+            cache.layout = Some(layout);
+        }
+    }
+
     cache.layout.clone()
 }
 
