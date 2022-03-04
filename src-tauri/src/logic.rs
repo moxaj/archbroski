@@ -187,15 +187,8 @@ impl UserSettings {
         let used_modifier_ids = self
             .combo_roster
             .iter()
-            .flat_map(|&combo_id| {
-                self.combo_catalog.iter().find_map(|combo| {
-                    if combo.id != combo_id {
-                        None
-                    } else {
-                        Some(&combo.combo)
-                    }
-                })
-            })
+            .flat_map(|&combo_id| self.combo_catalog.iter().find(|combo| combo.id == combo_id))
+            .map(|LabeledCombo { combo, .. }| combo)
             .flat_map(|combo| {
                 combo.iter().flat_map(|modifier_id| {
                     MODIFIERS.components[modifier_id]
@@ -391,14 +384,12 @@ pub fn suggest_modifier_id(
                 .combo_roster
                 .iter()
                 .flat_map(|&combo_id| {
-                    user_settings.combo_catalog.iter().find_map(|combo| {
-                        if combo.id != combo_id {
-                            None
-                        } else {
-                            Some(&combo.combo)
-                        }
-                    })
+                    user_settings
+                        .combo_catalog
+                        .iter()
+                        .find(|combo| combo.id == combo_id)
                 })
+                .map(|LabeledCombo { combo, .. }| combo)
                 .find(|combo| {
                     (0..queue.len()).all(|index| queue[index] == combo[index])
                         && combo
@@ -416,12 +407,11 @@ pub fn suggest_modifier_id(
                             user_settings
                                 .combo_catalog
                                 .iter()
-                                .find(|combo| combo.id != combo_id)
+                                .find(|combo| combo.id == combo_id)
                         })
+                        .map(|LabeledCombo { combo, .. }| combo)
                         .enumerate()
-                        .map(|(combo_index, LabeledCombo { combo, .. })| {
-                            ((combo_index as f32 + 1.0), combo)
-                        })
+                        .map(|(combo_index, combo)| ((combo_index as f32 + 1.0), combo))
                         .flat_map(|(combo_priority, combo)| {
                             combo
                                 .iter()
