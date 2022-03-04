@@ -12,6 +12,7 @@ type ComboRosterProps = {
     setUserSettings: React.Dispatch<React.SetStateAction<UserSettings | undefined>>;
     modifiers: Modifiers;
 };
+
 const comboLabel = ({ label, id }: LabeledCombo) => {
     return label !== ''
         ? label
@@ -19,6 +20,29 @@ const comboLabel = ({ label, id }: LabeledCombo) => {
 };
 const getUsedModifierIds = (modifiers: Modifiers, modifierId: number): number[] =>
     [modifierId, ...modifiers.byId[modifierId].recipe.flatMap(modifierId_ => getUsedModifierIds(modifiers, modifierId_))];
+
+const ModifierTierTicks = ({ tier }: { tier: number }) => {
+    return (
+        <>
+            {[...Array(tier)].map((_, index) => {
+                const u = (tier - 1) * -0.5 + index;
+                return (
+                    <Box key={index} sx={{
+                        position: 'absolute',
+                        top: 5,
+                        left: `calc(50% + ${u * 4}px)`,
+                        width: '2px',
+                        height: '4px',
+                        backgroundColor: 'white',
+                        transform: 'translate(-50%, -50%)'
+                    }}>
+                    </Box>
+                )
+            })}
+        </>
+    )
+};
+
 const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterProps) => {
     const toggleForbiddenModifierId = (modifierId: number) => {
         setUserSettings(userSettings => {
@@ -49,6 +73,10 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
             .find(({ id }) => id === draggedComboId)
             ?.combo.flatMap(modifierId => getUsedModifierIds(modifiers, modifierId)));
     }, [modifiers, userSettings, draggedComboId]);
+    const modifierTier = React.useCallback((modifierId: number): number => {
+        const { recipe } = modifiers.byId[modifierId];
+        return recipe.length === 0 ? 1 : 1 + Math.max(...recipe.map(modifierId_ => modifierTier(modifierId_)));
+    }, [modifiers]);
     const onDragStart = (result: DragStart) => {
         setDraggedComboId(+result.draggableId);
     };
@@ -188,12 +216,11 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                                                         transform: 'translateX(20%)'
                                                     }} />
                                                 </Zoom>
+                                                <ModifierTierTicks tier={modifierTier(modifierId)} />
                                                 <Chip
                                                     size='small'
                                                     label={modifier.name}
-                                                    sx={{
-                                                        m: 0.3
-                                                    }}
+                                                    sx={{ m: 0.5 }}
                                                     onClick={() => { toggleForbiddenModifierId(modifierId) }} />
                                             </Box>
                                         </Box>
