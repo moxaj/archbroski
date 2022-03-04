@@ -216,10 +216,9 @@ impl DiscSynchronized for UserSettings {
             combo_catalog: vec![
                 LabeledCombo::new(0, "All the uniques".to_owned(), vec![38, 60, 57, 58]),
                 LabeledCombo::new(1, "I love expedition".to_owned(), vec![37, 38, 31, 4]),
-                LabeledCombo::new(2, "$$$".to_owned(), vec![61, 62, 57, 59]),
             ],
-            combo_roster: vec![0, 1, 2],
-            forbidden_modifier_ids: collection![52, 56],
+            combo_roster: vec![0, 1],
+            forbidden_modifier_ids: collection![54, 55, 56, 59, 61, 62],
             hotkey: "alt + 1".to_owned(),
         }
     }
