@@ -14,7 +14,7 @@ Hotkey support is rather limited, `ctrl` / `alt` / `shift` + `a-z`, `0-9`, `F1-1
 
 ## Usage
 
-Approach an archnemesis statue and click its icon. Once the UI is visible, press your activation hotkey. Then, one of 3 things could happen:
+Approach an archnemesis statue and click its icon. Once the UI is visible, press your activation hotkey (default: `alt + 1`). Then, one of 3 things could happen:
  - __a__, a single modifier is highlighted and a __green checkmark__ pops up. Simply use that modifier.
  - __b__, the image recognition algorithm fails, indicated by a __red explamation point__. For why this might have happened, read through the `IMPORTANT` points below
  - __c__, the logic algorithm fails, indicated by a __red question mark__. Read the [Logic algorithm](#logic-algorithm) section to understand why this might have happened.
