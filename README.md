@@ -28,6 +28,7 @@ but subsequent activations should (eventually) be reasonably fast (< 100ms).
 > 2. when you press your activation key:
 >    - your stash, queue, and their immediate surroundings (~ 50 pixels around) > should be __fully visible and unobstructed__
 >     by anything (including your cursor!)
+>    - do __NOT__ have any recipe from the drop down list selected or have any text in the search textfield
 >    - do __NOT__ move your cursor around too much - for some obscure reason, the app won't be able to take a screenshot
 > 3. if, for any reason, your UI differs in size, or you use anything akin to Reshade, SweetFX, NVIDIA Freestyle, etc.,
 the image recognition is __very likely to fail__ (fail to recognize the layout or misidentify the modifiers)
