@@ -563,20 +563,20 @@ pub fn suggest_modifier_id(
                                         filler_modifiers_ids.contains(modifier_id)
                                     })
                                     .count();
-                                if combo.len() == QUEUE_LENGTH && filler_count == 0 {
-                                    suggestion = Some((combo, value, 0));
-                                    break;
-                                }
+                                if combo.len() == QUEUE_LENGTH {
+                                    if filler_count == 0 {
+                                        suggestion = Some((combo, value, 0));
+                                        break;
+                                    }
 
-                                if suggestion.is_none() || {
-                                    let (combo_, value_, filler_count_) =
-                                        suggestion.as_ref().unwrap();
-                                    combo.len() > combo_.len()
-                                        || combo.len() == combo_.len()
-                                            && value > *value_
-                                            && filler_count <= *filler_count_
-                                } {
-                                    suggestion = Some((combo, value, filler_count));
+                                    if filler_count <= 2
+                                        && suggestion
+                                            .as_ref()
+                                            .filter(|&(_, value_, _)| *value_ > value)
+                                            .is_none()
+                                    {
+                                        suggestion = Some((combo, value, filler_count));
+                                    }
                                 }
 
                                 indices.push(index as i32);
