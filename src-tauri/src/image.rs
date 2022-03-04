@@ -1,6 +1,7 @@
 use crate::logic::{ModifierId, MODIFIERS};
-use crate::{collection, timed, Cache};
+use crate::{collection, Cache};
 use itertools::Itertools;
+use log::{info, warn};
 use once_cell::sync::Lazy;
 use opencv::core::{min_max_loc, Point, Scalar, CV_32F, CV_8U};
 use opencv::imgcodecs::IMREAD_COLOR;
@@ -397,12 +398,15 @@ fn get_layout(cache: &mut Cache, screenshot: &Mat) -> Option<HashMap<u8, Vec2>> 
                 Some(layout)
             }
         } {
+            info!("using new valid layout");
             cache.layout = Some(layout);
             cache.layout.clone()
         } else {
+            warn!("invalid layout");
             None
         }
     } else {
+        info!("using previous valid layout");
         cache.layout.clone()
     }
 }
@@ -481,28 +485,25 @@ fn get_modifier_id(
 pub fn process_image(cache: &mut Cache, screenshot: Screenshot) -> Option<ProcessImageResult> {
     let screenshot = screenshot.into_mat();
     let screenshot_sync = MatSync(screenshot.clone());
-    timed!("recognize_layout", get_layout(cache, &screenshot)).map(|layout| {
+    get_layout(cache, &screenshot).map(|layout| {
         let cells = get_cells(&layout);
         let cache_mutex = Mutex::new(cache);
-        let modifier_ids = timed!(
-            "recognize_modifiers",
-            cells
-                .into_par_iter()
-                .map(|cell| {
-                    let grayscale = CELL_GROUPS[&cell.tag].lock().unwrap().grayscale;
-                    (
-                        cell.tag,
-                        cell.area,
-                        get_modifier_id(
-                            &mut cache_mutex.lock().unwrap(),
-                            &screenshot_sync,
-                            &cell,
-                            grayscale,
-                        ),
-                    )
-                })
-                .collect::<Vec<_>>()
-        );
+        let modifier_ids = cells
+            .into_par_iter()
+            .map(|cell| {
+                let grayscale = CELL_GROUPS[&cell.tag].lock().unwrap().grayscale;
+                (
+                    cell.tag,
+                    cell.area,
+                    get_modifier_id(
+                        &mut cache_mutex.lock().unwrap(),
+                        &screenshot_sync,
+                        &cell,
+                        grayscale,
+                    ),
+                )
+            })
+            .collect::<Vec<_>>();
         let modifier_ids_by_tags = modifier_ids.iter().into_group_map_by(|&&(tag, _, _)| tag);
         ProcessImageResult {
             stash_area: CELL_GROUPS[&0].lock().unwrap().area.translate(layout[&0]),

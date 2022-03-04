@@ -12,6 +12,11 @@ use crate::logic::suggest_modifier_id;
 use dashmap::DashMap;
 use image::{ProcessImageResult, Rectangle, Vec2};
 use itertools::Itertools;
+use log::{error, info, warn, LevelFilter};
+use log4rs::append::console::ConsoleAppender;
+use log4rs::append::file::FileAppender;
+use log4rs::config::{Appender, Root};
+use log4rs::Config;
 use logic::{ModifierId, Modifiers, UserSettings, MODIFIERS};
 use retry::delay::Fixed;
 use retry::retry;
@@ -87,6 +92,23 @@ enum ActivationError {
     DetectionError,
     #[error("failed to suggest a modifier")]
     LogicError,
+}
+
+fn init_logger() {
+    let config = Config::builder()
+        .appender(Appender::builder().build("stdout", Box::new(ConsoleAppender::builder().build())))
+        .appender(Appender::builder().build(
+            "stdout-file",
+            Box::new(FileAppender::builder().build("log/stdout.log").unwrap()),
+        ))
+        .build(
+            Root::builder()
+                .appender("stdout")
+                .appender("stdout-file")
+                .build(LevelFilter::Info),
+        )
+        .unwrap();
+    log4rs::init_config(config).unwrap();
 }
 
 fn create_settings_window(app: &tauri::AppHandle) {
@@ -201,6 +223,7 @@ fn activate(app: &tauri::AppHandle) {
             id: activation_state.0,
         };
         let activation_id = activation_state.0;
+        info!("activated with id: {:?}", activation_id);
         app.get_window("overlay")
             .unwrap()
             .emit("update", activation_state.1)
@@ -210,9 +233,15 @@ fn activate(app: &tauri::AppHandle) {
         let app = app.clone();
         std::thread::spawn(move || {
             if let Err(error) = Display::primary()
-                .map_err(|_| ActivationError::DetectionError)
+                .map_err(|err| {
+                    error!("failed to get primary display: {:?}", err);
+                    ActivationError::DetectionError
+                })
                 .and_then(|display| {
-                    Capturer::new(display).map_err(|_| ActivationError::DetectionError)
+                    Capturer::new(display).map_err(|err| {
+                        error!("failed to create a capturer: {:?}", err);
+                        ActivationError::DetectionError
+                    })
                 })
                 .and_then(|mut capturer| {
                     retry(Fixed::from_millis(20).take(10), || {
@@ -222,7 +251,10 @@ fn activate(app: &tauri::AppHandle) {
                             .frame()
                             .map(|frame| (frame.to_vec(), capturer_width, capturer_height))
                     })
-                    .map_err(|_| ActivationError::DetectionError)
+                    .map_err(|err| {
+                        error!("failed to take a screenshot: {:?}", err);
+                        ActivationError::DetectionError
+                    })
                 })
                 .and_then(|(buffer, width, height)| {
                     let cache_state = app.state::<Result<Mutex<Cache>, &'static str>>();
@@ -236,7 +268,10 @@ fn activate(app: &tauri::AppHandle) {
                             height,
                         },
                     )
-                    .ok_or(ActivationError::DetectionError)
+                    .ok_or_else(|| {
+                        warn!("failed to process the screenshot");
+                        ActivationError::DetectionError
+                    })
                 })
                 .and_then(
                     |ProcessImageResult {
@@ -250,6 +285,7 @@ fn activate(app: &tauri::AppHandle) {
                             .count()
                             == 4
                         {
+                            warn!("tried to activate with 4 modifiers in the queue");
                             Err(ActivationError::LogicError)
                         } else {
                             let stash_by_modifier_ids = stash_modifier_ids.iter().fold(
@@ -271,30 +307,34 @@ fn activate(app: &tauri::AppHandle) {
 
                             let user_settings_state =
                                 app.state::<Result<Mutex<UserSettings>, &'static str>>();
-                            timed!(
-                                "suggest modifier id",
-                                suggest_modifier_id(
-                                    &mut cache,
-                                    &user_settings_state.as_ref().unwrap().lock().unwrap(),
-                                    stash_modifier_ids
-                                        .values()
-                                        .filter_map(|modifier_id| modifier_id.as_ref())
-                                        .copied()
-                                        .counts()
-                                        .into_iter()
-                                        .collect(),
-                                    queue_modifier_ids
-                                        .iter()
-                                        .filter_map(|modifier_id| modifier_id.as_ref())
-                                        .copied()
-                                        .collect_vec()
-                                )
+                            let user_settings =
+                                user_settings_state.as_ref().unwrap().lock().unwrap();
+                            suggest_modifier_id(
+                                &mut cache,
+                                &user_settings,
+                                stash_modifier_ids
+                                    .values()
+                                    .filter_map(|modifier_id| modifier_id.as_ref())
+                                    .copied()
+                                    .counts()
+                                    .into_iter()
+                                    .collect(),
+                                queue_modifier_ids
+                                    .iter()
+                                    .filter_map(|modifier_id| modifier_id.as_ref())
+                                    .copied()
+                                    .collect_vec(),
                             )
-                            .ok_or_else(|| ActivationError::LogicError)
+                            .ok_or_else(|| {
+                                warn!("failed to suggest a modifier");
+                                ActivationError::LogicError
+                            })
                             .and_then(|suggested_modifier_id| {
                                 if cache.modified {
-                                    cache.save().map_err(|_| ActivationError::DetectionError)?;
-                                    // TODO handle error
+                                    cache.save().map_err(|err| {
+                                        error!("failed to sync cache: {:?}", err);
+                                        ActivationError::DetectionError
+                                    })?;
                                 }
 
                                 Ok(suggested_modifier_id)
@@ -311,6 +351,7 @@ fn activate(app: &tauri::AppHandle) {
                                 let mut activation_state = activation_state_state.lock().unwrap();
                                 if let ActivationState::Computing { id } = activation_state.1 {
                                     if id == activation_id {
+                                        info!("successful activation with id: {:?}", activation_id);
                                         activation_state.1 = ActivationState::Computed {
                                             stash_area,
                                             suggested_cell_area,
@@ -330,6 +371,7 @@ fn activate(app: &tauri::AppHandle) {
                 let mut activation_state = activation_state_state.lock().unwrap();
                 if let ActivationState::Computing { id } = activation_state.1 {
                     if id == activation_id {
+                        warn!("failed to activate with id: {:?}", activation_id);
                         activation_state.1 = match error {
                             ActivationError::DetectionError => ActivationState::DetectionError,
                             ActivationError::LogicError => ActivationState::LogicError,
@@ -462,6 +504,8 @@ fn main() {
             }
         })
         .setup(|app| {
+            init_logger();
+            info!("log4rs up and running");
             app.manage(
                 UserSettings::load_or_new_saved()
                     .map(Mutex::new)
@@ -472,14 +516,14 @@ fn main() {
                     .map(Mutex::new)
                     .map_err(|_| "failed_to_load_cache"),
             );
-            if get_error_message(
+            if let Some(err) = get_error_message(
                 app.state::<Result<Mutex<UserSettings>, &'static str>>(),
                 app.state::<Result<Mutex<Cache>, &'static str>>(),
-            )
-            .is_some()
-            {
+            ) {
+                error!("failed to start: {}", err);
                 create_error_window(&app.handle());
             } else {
+                info!("archbroski up and running");
                 app.manage(Mutex::new((0u64, ActivationState::Hidden)));
                 create_overlay_window(&app.handle());
                 set_initial_hotkey(&app.handle());

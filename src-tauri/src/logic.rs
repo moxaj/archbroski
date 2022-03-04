@@ -1,6 +1,7 @@
 use crate::utils::{DiscSynchronized, JsonDiscSynchronized};
 use crate::{collection, Cache};
 use itertools::Itertools;
+use log::{info, warn};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering::Equal;
@@ -397,7 +398,13 @@ pub fn suggest_modifier_id(
                             .all(|&modifier_id| owns_modifier(&stash, modifier_id))
                 })
                 .cloned()
+                .map(|combo| {
+                    info!("found active combo to use: {:?}", combo);
+                    combo
+                })
                 .or_else(|| {
+                    info!("no active combo to use");
+
                     let filler_modifiers_ids = user_settings.get_filler_modifier_ids();
                     let mut modifier_ids = user_settings
                         .combo_roster
@@ -498,6 +505,11 @@ pub fn suggest_modifier_id(
                             .map(|&modifier_id| (None, collection![modifier_id])),
                     );
 
+                    info!(
+                        "trying to find a combo with modifier ids: {:?}",
+                        modifier_ids
+                    );
+
                     let mut indices = vec![-1i32];
                     let mut suggestion: Option<(Vec<ModifierId>, f32, usize)> = None;
                     loop {
@@ -585,6 +597,13 @@ pub fn suggest_modifier_id(
                         } else {
                             break;
                         }
+                    }
+
+                    // TODO if inventory is full and there aren't enough fillers, use a non filler we have an abundance of
+
+                    match suggestion {
+                        Some((ref combo, ..)) => info!("suggested combo: {:?}", combo),
+                        None => warn!("failed to suggest a combo"),
                     }
 
                     suggestion.map(|(suggested_combo, _, _)| suggested_combo)
