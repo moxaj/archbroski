@@ -66,27 +66,16 @@ impl DiscSynchronized for Cache {
 impl BincodeDiscSynchronized for Cache {}
 
 #[derive(Clone, Copy, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Highlight {
-    stash_area: Rectangle,
-    suggested_cell_area: Rectangle,
-}
-
-impl Highlight {
-    fn new(stash_area: Rectangle, suggested_cell_area: Rectangle) -> Self {
-        Self {
-            stash_area,
-            suggested_cell_area,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Serialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all = "camelCase")]
 enum ActivationState {
     Hidden,
-    Computing { id: u64 },
-    Computed(Highlight),
+    Computing {
+        id: u64,
+    },
+    Computed {
+        stash_area: Rectangle,
+        suggested_cell_area: Rectangle,
+    },
     DetectionError,
     LogicError,
 }
@@ -321,9 +310,10 @@ fn activate(app: &tauri::AppHandle) {
                                 let mut activation_state = activation_state_state.lock().unwrap();
                                 if let ActivationState::Computing { id } = activation_state.1 {
                                     if id == activation_id {
-                                        activation_state.1 = ActivationState::Computed(
-                                            Highlight::new(stash_area, suggested_cell_area),
-                                        );
+                                        activation_state.1 = ActivationState::Computed {
+                                            stash_area,
+                                            suggested_cell_area,
+                                        };
                                         app.get_window("overlay")
                                             .unwrap()
                                             .emit("update", activation_state.1)
