@@ -1,7 +1,7 @@
 import React from 'react';
 import { TransitionGroup } from 'react-transition-group';
-import { Lock } from '@mui/icons-material';
-import { Box, Typography, Chip, Divider, Zoom } from '@mui/material';
+import { Info, Lock } from '@mui/icons-material';
+import { Box, Typography, Chip, Divider, Zoom, Tooltip } from '@mui/material';
 import { UserSettings, Modifiers, LabeledCombo } from './Settings';
 import WithLoading from './WithLoading';
 import { numberKeys } from '.';
@@ -104,7 +104,7 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
     return (
         <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
             <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
-                <Box sx={{ width: 1, height: 360, display: 'flex' }}>
+                <Box sx={{ position: 'relative', width: 1, height: 360, display: 'flex' }}>
                     <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
                         <Box sx={{ flex: 1, height: 1, mx: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                             <Typography variant='body2' sx={{ width: 150, my: 1, textTransform: 'uppercase', textAlign: 'center' }}>
@@ -159,6 +159,9 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                             </Droppable>
                         </Box>
                     </DragDropContext>
+                    <Tooltip title='Drag & drop combos to (de)active them and modify their priorities.'>
+                        <Info sx={{ position: 'absolute', right: 0, bottom: 0, m: 1 }} />
+                    </Tooltip>
                 </Box>
                 <Divider />
                 <Box sx={{ width: 1, flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

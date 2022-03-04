@@ -58,7 +58,7 @@ const GeneralSettings = ({ userSettings, setUserSettings }: GeneralSettingsProps
             <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ display: 'flex' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                        <Typography sx={{ my: 1 }}>
+                        <Typography variant='h6' sx={{ my: 1 }}>
                             Hotkey
                         </Typography>
                         <Button variant='outlined' sx={{ width: 200 }} onClick={() => { setRecordingHotkey(true) }}>
