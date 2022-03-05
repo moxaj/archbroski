@@ -376,7 +376,7 @@ fn get_layout(cache: &mut Cache, screenshot: &MatSync) -> Option<HashMap<u8, Vec
                 .unwrap(),
             )
             .unwrap();
-            match_template(&source, &cell_group.template).1 > 0.95
+            match_template(&source, &cell_group.template).1 > 0.98
         })
     };
     if cache.layout.as_ref().filter(layout_matches).is_none() {
@@ -397,11 +397,11 @@ fn get_layout(cache: &mut Cache, screenshot: &MatSync) -> Option<HashMap<u8, Vec
             if layout.len() < CELL_GROUPS.len() {
                 None
             } else {
-                cache.modified = true;
                 Some(layout)
             }
         } {
             info!("using new valid layout");
+            cache.modified = true;
             cache.layout = Some(layout);
             cache.layout.clone()
         } else {
@@ -428,7 +428,7 @@ fn get_cells(layout: &HashMap<u8, Vec2>) -> Vec<Cell> {
                     tag,
                     area: cell_area.translate(cell_group_offset),
                 })
-                .collect::<Vec<_>>()
+                .collect_vec()
         })
         .collect_vec()
 }
@@ -491,7 +491,7 @@ pub fn process_image(cache: &mut Cache, screenshot: Screenshot) -> Option<Proces
         let cache_images = &cache.images;
         let cache_images_count = cache_images.len();
         let modifier_ids = info_timed!(
-            "match cells",
+            "match_cells",
             cells
                 .into_par_iter()
                 .map(|cell| {

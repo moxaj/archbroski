@@ -7,8 +7,11 @@ mod image;
 mod logic;
 mod utils;
 
+#[cfg(test)]
+mod tests;
+
 use crate::image::{process_image, Screenshot};
-use crate::logic::suggest_modifier_id;
+use crate::logic::suggest_combo_cached;
 use dashmap::DashMap;
 use image::{ProcessImageResult, Rectangle, Vec2};
 use itertools::Itertools;
@@ -44,14 +47,14 @@ pub struct Cache {
     pub modified: bool,
     pub layout: Option<HashMap<u8, Vec2>>,
     pub images: DashMap<u64, Option<ModifierId>>,
-    pub suggested_modifier_ids: HashMap<u64, Option<ModifierId>>,
+    pub suggested_combos: HashMap<u64, Option<Vec<ModifierId>>>,
 }
 
 impl Cache {
     fn clear(&mut self) {
         self.layout = None;
         self.images.clear();
-        self.suggested_modifier_ids.clear();
+        self.suggested_combos.clear();
     }
 }
 
@@ -61,7 +64,7 @@ impl DiscSynchronized for Cache {
             modified: false,
             layout: None,
             images: DashMap::new(),
-            suggested_modifier_ids: HashMap::new(),
+            suggested_combos: HashMap::new(),
         }
     }
 
@@ -242,7 +245,7 @@ fn activate(app: &tauri::AppHandle) {
 
         let app = app.clone();
         std::thread::spawn(move || {
-            if let Err(error) = Display::primary()
+            match Display::primary()
                 .map_err(|err| {
                     error!("failed to get primary display: {:?}", err);
                     ActivationError::DetectionError
@@ -282,10 +285,7 @@ fn activate(app: &tauri::AppHandle) {
                             height,
                         },
                     )
-                    .ok_or_else(|| {
-                        warn!("failed to process the screenshot");
-                        ActivationError::DetectionError
-                    })
+                    .ok_or(ActivationError::DetectionError)
                 })
                 .and_then(
                     |ProcessImageResult {
@@ -293,56 +293,41 @@ fn activate(app: &tauri::AppHandle) {
                          stash_modifier_ids,
                          queue_modifier_ids,
                      }| {
-                        if queue_modifier_ids
-                            .iter()
-                            .filter(|&&modifier_id| modifier_id.is_some())
-                            .count()
-                            == 4
-                        {
-                            warn!("tried to activate with 4 modifiers in the queue");
-                            Err(ActivationError::LogicError)
-                        } else {
-                            let stash_by_modifier_ids = stash_modifier_ids.iter().fold(
-                                HashMap::<ModifierId, BTreeSet<Rectangle>>::new(),
-                                |mut stash_by_modifier_ids, (&cell_area, &modifier_id)| {
-                                    if let Some(modifier_id) = modifier_id {
-                                        stash_by_modifier_ids
-                                            .entry(modifier_id)
-                                            .or_default()
-                                            .insert(cell_area);
-                                    }
-
+                        let stash_areas = stash_modifier_ids.iter().fold(
+                            HashMap::<ModifierId, BTreeSet<Rectangle>>::new(),
+                            |mut stash_by_modifier_ids, (&cell_area, &modifier_id)| {
+                                if let Some(modifier_id) = modifier_id {
                                     stash_by_modifier_ids
-                                },
-                            );
+                                        .entry(modifier_id)
+                                        .or_default()
+                                        .insert(cell_area);
+                                }
 
-                            let cache_state = app.state::<Result<Mutex<Cache>, &'static str>>();
-                            let mut cache = cache_state.as_ref().unwrap().lock().unwrap();
+                                stash_by_modifier_ids
+                            },
+                        );
+                        let stash = stash_modifier_ids
+                            .values()
+                            .filter_map(|modifier_id| modifier_id.as_ref())
+                            .copied()
+                            .counts()
+                            .into_iter()
+                            .collect();
+                        let queue = queue_modifier_ids
+                            .iter()
+                            .filter_map(|modifier_id| modifier_id.as_ref())
+                            .copied()
+                            .collect_vec();
 
-                            let user_settings_state =
-                                app.state::<Result<Mutex<UserSettings>, &'static str>>();
-                            let user_settings =
-                                user_settings_state.as_ref().unwrap().lock().unwrap();
-                            suggest_modifier_id(
-                                &mut cache,
-                                &user_settings,
-                                stash_modifier_ids
-                                    .values()
-                                    .filter_map(|modifier_id| modifier_id.as_ref())
-                                    .copied()
-                                    .counts()
-                                    .into_iter()
-                                    .collect(),
-                                queue_modifier_ids
-                                    .iter()
-                                    .filter_map(|modifier_id| modifier_id.as_ref())
-                                    .copied()
-                                    .collect_vec(),
-                            )
-                            .ok_or_else(|| {
-                                warn!("failed to suggest a modifier");
-                                ActivationError::LogicError
-                            })
+                        let cache_state = app.state::<Result<Mutex<Cache>, &'static str>>();
+                        let mut cache = cache_state.as_ref().unwrap().lock().unwrap();
+
+                        let user_settings_state =
+                            app.state::<Result<Mutex<UserSettings>, &'static str>>();
+                        let user_settings = user_settings_state.as_ref().unwrap().lock().unwrap();
+                        suggest_combo_cached(&mut cache, &user_settings, &stash, &queue)
+                            .ok_or(ActivationError::LogicError)
+                            .map(|combo| combo[queue.len()])
                             .and_then(|suggested_modifier_id| {
                                 if cache.modified {
                                     cache.save().map_err(|err| {
@@ -354,46 +339,45 @@ fn activate(app: &tauri::AppHandle) {
                                 Ok(suggested_modifier_id)
                             })
                             .map(|suggested_modifier_id| {
-                                let suggested_cell_area = *stash_by_modifier_ids
-                                    [&suggested_modifier_id]
-                                    .iter()
-                                    .next()
-                                    .unwrap();
-
-                                let activation_state_state =
-                                    app.state::<Mutex<(u64, ActivationState)>>();
-                                let mut activation_state = activation_state_state.lock().unwrap();
-                                if let ActivationState::Computing { id } = activation_state.1 {
-                                    if id == activation_id {
-                                        info!("successful activation with id: {:?}", activation_id);
-                                        activation_state.1 = ActivationState::Computed {
-                                            stash_area,
-                                            suggested_cell_area,
-                                        };
-                                        app.get_window("overlay")
-                                            .unwrap()
-                                            .emit("update", activation_state.1)
-                                            .unwrap();
-                                    }
-                                }
+                                (
+                                    stash_area,
+                                    *stash_areas[&suggested_modifier_id].iter().next().unwrap(),
+                                )
                             })
-                        }
                     },
-                )
-            {
-                let activation_state_state = app.state::<Mutex<(u64, ActivationState)>>();
-                let mut activation_state = activation_state_state.lock().unwrap();
-                if let ActivationState::Computing { id } = activation_state.1 {
-                    if id == activation_id {
-                        warn!("failed to activate with id: {:?}", activation_id);
-                        activation_state.1 = match error {
-                            ActivationError::DetectionError => ActivationState::DetectionError,
-                            ActivationError::LogicError => ActivationState::LogicError,
-                        };
-                        app.get_window("overlay")
-                            .unwrap()
-                            .emit("update", activation_state.1)
-                            .unwrap();
+                ) {
+                Ok((stash_area, suggested_cell_area)) => {
+                    let activation_state_state = app.state::<Mutex<(u64, ActivationState)>>();
+                    let mut activation_state = activation_state_state.lock().unwrap();
+                    if let ActivationState::Computing { id } = activation_state.1 {
+                        if id == activation_id {
+                            info!("activated with id: {:?}", activation_id);
+                            activation_state.1 = ActivationState::Computed {
+                                stash_area,
+                                suggested_cell_area,
+                            };
+                            app.get_window("overlay")
+                                .unwrap()
+                                .emit("update", activation_state.1)
+                                .unwrap();
+                        }
+                    }
+                }
+                Err(err) => {
+                    let activation_state_state = app.state::<Mutex<(u64, ActivationState)>>();
+                    let mut activation_state = activation_state_state.lock().unwrap();
+                    if let ActivationState::Computing { id } = activation_state.1 {
+                        if id == activation_id {
+                            warn!("failed to activate with id: {:?}", activation_id);
+                            activation_state.1 = match err {
+                                ActivationError::DetectionError => ActivationState::DetectionError,
+                                ActivationError::LogicError => ActivationState::LogicError,
+                            };
+                            app.get_window("overlay")
+                                .unwrap()
+                                .emit("update", activation_state.1)
+                                .unwrap();
+                        }
                     }
                 }
             }

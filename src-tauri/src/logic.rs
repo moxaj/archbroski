@@ -21,6 +21,35 @@ const TIME_BUDGET_MS: u128 = 100;
 
 const REROLL_MULTIPLIER: f64 = 0.25;
 
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, Serialize, Deserialize)]
+pub enum Reward {
+    Generic,
+    Armour,
+    Weapon,
+    Jewelry,
+    Gem,
+    Map,
+    DivinationCard,
+    Fragment,
+    Essence,
+    Harbinger,
+    Unique,
+    Delve,
+    Blight,
+    Ritual,
+    Currency,
+    Legion,
+    Breach,
+    Labyrinth,
+    Scarab,
+    Abyss,
+    Heist,
+    Expedition,
+    Delirium,
+    Metamorph,
+    Treant,
+}
+
 static REWARD_VALUES: Lazy<HashMap<Reward, u32>> = Lazy::new(|| {
     collection![
         Generic => 1,
@@ -51,39 +80,6 @@ static REWARD_VALUES: Lazy<HashMap<Reward, u32>> = Lazy::new(|| {
     ]
 });
 
-pub static MODIFIERS: Lazy<Modifiers> = Lazy::new(Modifiers::new);
-
-pub type ModifierId = u8;
-
-#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, Serialize, Deserialize)]
-pub enum Reward {
-    Generic,
-    Armour,
-    Weapon,
-    Jewelry,
-    Gem,
-    Map,
-    DivinationCard,
-    Fragment,
-    Essence,
-    Harbinger,
-    Unique,
-    Delve,
-    Blight,
-    Ritual,
-    Currency,
-    Legion,
-    Breach,
-    Labyrinth,
-    Scarab,
-    Abyss,
-    Heist,
-    Expedition,
-    Delirium,
-    Metamorph,
-    Treant,
-}
-
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum Effect {
     Reroll { count: usize },
@@ -91,6 +87,8 @@ pub enum Effect {
     DoubledReward,
     Convert { to: Reward },
 }
+
+pub type ModifierId = u8;
 
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -157,6 +155,8 @@ impl Modifiers {
         }
     }
 }
+
+pub static MODIFIERS: Lazy<Modifiers> = Lazy::new(Modifiers::new);
 
 pub type ComboId = u64;
 
@@ -343,21 +343,21 @@ fn get_produced_modifier_ids(combo: &[ModifierId]) -> HashSet<ModifierId> {
 
 fn get_unordered_combo_value(
     queue: &[ModifierId],
-    combo: &BTreeSet<ModifierId>,
+    unordered_combo: &BTreeSet<ModifierId>,
     required_modifier_ids: &HashSet<ModifierId>,
 ) -> Option<(Vec<ModifierId>, f32)> {
-    combo
+    unordered_combo
         .difference(&queue.iter().copied().collect::<BTreeSet<_>>())
-        .permutations(combo.len() - queue.len())
-        .filter_map(|combo_permutation_suffix| {
-            let mut combo_permutation = queue.iter().copied().collect_vec();
-            combo_permutation.extend(combo_permutation_suffix);
-
-            if get_produced_modifier_ids(&combo_permutation).is_superset(required_modifier_ids) {
-                Some((
-                    combo_permutation.clone(),
-                    get_combo_value(&combo_permutation),
-                ))
+        .permutations(unordered_combo.len() - queue.len())
+        .filter_map(|combo_suffix| {
+            let combo = queue
+                .iter()
+                .chain(combo_suffix.iter().copied())
+                .copied()
+                .collect_vec();
+            if get_produced_modifier_ids(&combo).is_superset(required_modifier_ids) {
+                let combo_value = get_combo_value(&combo);
+                Some((combo, combo_value))
             } else {
                 None
             }
@@ -365,258 +365,264 @@ fn get_unordered_combo_value(
         .max_by_key(|&(_, value)| value.floor() as i32)
 }
 
-pub fn suggest_modifier_id(
+fn suggest_active_combo(
+    user_settings: &UserSettings,
+    stash: &BTreeMap<ModifierId, usize>,
+    queue: &Vec<ModifierId>,
+) -> Option<Vec<ModifierId>> {
+    user_settings
+        .combo_roster
+        .iter()
+        .map(|&combo_id| {
+            &user_settings
+                .combo_catalog
+                .iter()
+                .find(|combo| combo.id == combo_id)
+                .unwrap()
+                .combo
+        })
+        .find(|combo| {
+            (0..queue.len()).all(|index| queue[index] == combo[index])
+                && combo
+                    .iter()
+                    .skip(queue.len())
+                    .all(|&modifier_id| owns_modifier(&stash, modifier_id))
+        })
+        .cloned()
+        .map(|combo| {
+            info!("suggested active combo: {:?}", combo);
+            combo
+        })
+}
+
+fn suggest_custom_combo(
+    user_settings: &UserSettings,
+    stash: &BTreeMap<ModifierId, usize>,
+    queue: &Vec<ModifierId>,
+) -> Option<Vec<ModifierId>> {
+    let filler_modifiers_ids = user_settings.get_filler_modifier_ids();
+    let usable_modifier_ids = user_settings
+        .combo_roster
+        .iter()
+        .flat_map(|&combo_id| {
+            user_settings
+                .combo_catalog
+                .iter()
+                .find(|combo| combo.id == combo_id)
+        })
+        .map(|LabeledCombo { combo, .. }| combo)
+        .enumerate()
+        .map(|(combo_index, combo)| ((combo_index as f32 + 1.0), combo))
+        .flat_map(|(combo_priority, combo)| {
+            let mut required_modifier_ids = HashMap::new();
+            for modifier_id in combo {
+                required_modifier_ids.insert(*modifier_id, 1);
+                required_modifier_ids = MODIFIERS.components[modifier_id].iter().fold(
+                    required_modifier_ids,
+                    |mut required_modifier_ids, (&modifier_id, &modifier_id_count)| {
+                        *required_modifier_ids.entry(modifier_id).or_default() += modifier_id_count;
+                        required_modifier_ids
+                    },
+                );
+            }
+
+            let mut owned_modifier_ids = HashMap::new();
+            let mut modifier_ids = combo
+                .iter()
+                .map(|&modifier_id| (modifier_id, 0))
+                .collect::<VecDeque<_>>();
+            while let Some((modifier_id, parent_count)) = modifier_ids.pop_front() {
+                let owned_count = owned_modifier_ids
+                    .entry(modifier_id)
+                    .or_insert_with(|| stash.get(&modifier_id).copied().unwrap_or_default());
+                *owned_count += parent_count;
+
+                modifier_ids.extend(
+                    MODIFIERS.by_id[&modifier_id]
+                        .recipe
+                        .iter()
+                        .map(|&modifier_id| (modifier_id, *owned_count)),
+                );
+            }
+
+            required_modifier_ids
+                .iter()
+                .map(|(&modifier_id, &required_count)| {
+                    (
+                        modifier_id,
+                        combo_priority as f32,
+                        (owned_modifier_ids
+                            .get(&modifier_id)
+                            .copied()
+                            .unwrap_or_default() as f32)
+                            / (required_count as f32),
+                    )
+                })
+                .filter(|(modifier_id, _, _)| {
+                    let recipe = MODIFIERS.by_id[modifier_id].recipe.clone();
+                    if recipe.is_empty() {
+                        return false;
+                    }
+
+                    let remanining_recipe: BTreeSet<_> = recipe
+                        .difference(&queue.iter().copied().collect())
+                        .copied()
+                        .collect();
+                    !remanining_recipe.is_empty()
+                        && remanining_recipe
+                            .iter()
+                            .all(|&modifier_id| owns_modifier(&stash, modifier_id))
+                })
+                .collect_vec()
+        })
+        .map(|(modifier_id, combo_priority, modifier_priority)| {
+            (modifier_id, combo_priority + modifier_priority)
+        })
+        .sorted_by(|&(_, priority1), &(_, priority2)| {
+            priority1.partial_cmp(&priority2).unwrap_or(Equal)
+        })
+        .map(|(modifier_id, _)| {
+            (
+                Some(modifier_id),
+                MODIFIERS.by_id[&modifier_id].recipe.clone(),
+            )
+        })
+        .dedup()
+        .chain(
+            filler_modifiers_ids
+                .iter()
+                .sorted_by(|&&modifier_id1, &&modifier_id2| {
+                    Ord::cmp(
+                        &owned_modifier_count(&stash, modifier_id1),
+                        &owned_modifier_count(&stash, modifier_id2),
+                    )
+                    .reverse()
+                })
+                .filter(|&&modifier_id| owns_modifier(&stash, modifier_id))
+                .map(|&modifier_id| (None, collection![modifier_id])),
+        )
+        .collect_vec();
+    let mut indices = vec![-1i32];
+    let mut suggested_combo_and_value: Option<(Vec<ModifierId>, f32)> = None;
+    let time_before = Instant::now();
+    loop {
+        if time_before.elapsed().as_millis() > TIME_BUDGET_MS && suggested_combo_and_value.is_some()
+        {
+            break;
+        }
+
+        if let Some(index) = indices.pop() {
+            if let Some((index, combo, value)) = usable_modifier_ids
+                .iter()
+                .enumerate()
+                .skip((index + 1) as usize)
+                .find_map(|(index, (modifier_id, recipe))| {
+                    let mut produced_modifier_ids = HashSet::<ModifierId>::new();
+                    produced_modifier_ids.extend(get_produced_modifier_ids(&queue));
+                    produced_modifier_ids.extend(
+                        indices
+                            .iter()
+                            .filter_map(|&index| usable_modifier_ids[index as usize].0),
+                    );
+
+                    if let &Some(modifier_id) = modifier_id {
+                        produced_modifier_ids.insert(modifier_id);
+                    }
+
+                    let mut recipes = indices
+                        .iter()
+                        .map(|&index| usable_modifier_ids[index as usize].1.clone())
+                        .collect_vec();
+                    recipes.push(recipe.clone());
+
+                    let mut combo =
+                        recipes
+                            .iter()
+                            .fold(BTreeSet::<ModifierId>::new(), |mut combo, recipe| {
+                                combo.extend(recipe);
+                                combo
+                            });
+                    if combo.len() != recipes.iter().map(BTreeSet::len).sum::<usize>() {
+                        return None;
+                    }
+
+                    combo.extend(queue);
+                    if combo.len() > QUEUE_LENGTH {
+                        return None;
+                    }
+
+                    get_unordered_combo_value(&queue, &combo, &produced_modifier_ids)
+                        .map(|(combo, value)| (index, combo, value))
+                })
+            {
+                let filler_count = combo
+                    .iter()
+                    .filter(|&modifier_id| filler_modifiers_ids.contains(modifier_id))
+                    .count();
+                if combo.len() == QUEUE_LENGTH {
+                    if filler_count == 0 {
+                        suggested_combo_and_value = Some((combo, value));
+                        break;
+                    }
+
+                    if filler_count <= 2
+                        && suggested_combo_and_value
+                            .as_ref()
+                            .filter(|&(_, value_)| *value_ > value)
+                            .is_none()
+                    {
+                        suggested_combo_and_value = Some((combo, value));
+                    }
+                }
+
+                indices.push(index as i32);
+                indices.push(index as i32);
+            }
+        } else {
+            break;
+        }
+    }
+
+    // TODO if inventory is full and there aren't enough fillers, use a non filler we have an abundance of
+    suggested_combo_and_value.map(|(combo, _)| {
+        info!("suggested custom combo: {:?}", combo);
+        combo
+    })
+}
+
+pub fn suggest_combo(
+    user_settings: &UserSettings,
+    stash: &BTreeMap<ModifierId, usize>,
+    queue: &Vec<ModifierId>,
+) -> Option<Vec<ModifierId>> {
+    if queue.len() == 4 {
+        warn!("cannot suggest a combo with 4 queued modifiers");
+        None
+    } else {
+        suggest_active_combo(user_settings, &stash, &queue)
+            .or_else(|| suggest_custom_combo(user_settings, &stash, &queue))
+            .or_else(|| {
+                warn!("failed to suggest a combo");
+                None
+            })
+    }
+}
+
+pub fn suggest_combo_cached(
     cache: &mut Cache,
     user_settings: &UserSettings,
-    stash: BTreeMap<ModifierId, usize>,
-    queue: Vec<ModifierId>,
-) -> Option<ModifierId> {
+    stash: &BTreeMap<ModifierId, usize>,
+    queue: &Vec<ModifierId>,
+) -> Option<Vec<ModifierId>> {
     let mut hasher = DefaultHasher::new();
-    (user_settings.clone(), stash.clone(), queue.clone()).hash(&mut hasher);
+    (user_settings, stash, queue).hash(&mut hasher);
     let cache_key = hasher.finish();
-    *cache
-        .suggested_modifier_ids
+    cache
+        .suggested_combos
         .entry(cache_key)
         .or_insert_with(|| {
             cache.modified = true;
-            let time_before = Instant::now();
-            user_settings
-                .combo_roster
-                .iter()
-                .flat_map(|&combo_id| {
-                    user_settings
-                        .combo_catalog
-                        .iter()
-                        .find(|combo| combo.id == combo_id)
-                })
-                .map(|LabeledCombo { combo, .. }| combo)
-                .find(|combo| {
-                    (0..queue.len()).all(|index| queue[index] == combo[index])
-                        && combo
-                            .iter()
-                            .skip(queue.len())
-                            .all(|&modifier_id| owns_modifier(&stash, modifier_id))
-                })
-                .cloned()
-                .map(|combo| {
-                    info!("found active combo to use: {:?}", combo);
-                    combo
-                })
-                .or_else(|| {
-                    info!("no active combo to use");
-
-                    let filler_modifiers_ids = user_settings.get_filler_modifier_ids();
-                    let mut modifier_ids = user_settings
-                        .combo_roster
-                        .iter()
-                        .flat_map(|&combo_id| {
-                            user_settings
-                                .combo_catalog
-                                .iter()
-                                .find(|combo| combo.id == combo_id)
-                        })
-                        .map(|LabeledCombo { combo, .. }| combo)
-                        .enumerate()
-                        .map(|(combo_index, combo)| ((combo_index as f32 + 1.0), combo))
-                        .flat_map(|(combo_priority, combo)| {
-                            let mut required_modifier_ids = HashMap::new();
-                            for modifier_id in combo {
-                                required_modifier_ids.insert(*modifier_id, 1);
-                                required_modifier_ids = MODIFIERS.components[modifier_id]
-                                    .iter()
-                                    .fold(
-                                    required_modifier_ids,
-                                    |mut required_modifier_ids, (&modifier_id, &modifier_id_count)| {
-                                        *required_modifier_ids.entry(modifier_id).or_default() +=
-                                            modifier_id_count;
-                                        required_modifier_ids
-                                    },
-                                );
-                            }
-
-                            let mut owned_modifier_ids = HashMap::new();
-                            let mut modifier_ids = combo
-                                .iter()
-                                .map(|&modifier_id| (modifier_id, 0))
-                                .collect::<VecDeque<_>>();
-                            while let Some((modifier_id, parent_count)) = modifier_ids.pop_front() {
-                                let owned_count =
-                                    owned_modifier_ids.entry(modifier_id).or_insert_with(|| {
-                                        stash.get(&modifier_id).copied().unwrap_or_default()
-                                    });
-                                *owned_count += parent_count;
-
-                                modifier_ids.extend(
-                                    MODIFIERS.by_id[&modifier_id]
-                                        .recipe
-                                        .iter()
-                                        .map(|&modifier_id| (modifier_id, *owned_count)),
-                                );
-                            }
-
-                            required_modifier_ids
-                                .iter()
-                                .map(|(&modifier_id, &required_count)| {
-                                    (
-                                        modifier_id,
-                                        combo_priority as f32,
-                                        (owned_modifier_ids
-                                            .get(&modifier_id)
-                                            .copied()
-                                            .unwrap_or_default()
-                                            as f32)
-                                            / (required_count as f32),
-                                    )
-                                })
-                                .filter(|(modifier_id, _, _)| {
-                                    let recipe = MODIFIERS.by_id[modifier_id].recipe.clone();
-                                    if recipe.is_empty() {
-                                        return false;
-                                    }
-
-                                    let remanining_recipe: BTreeSet<_> = recipe
-                                        .difference(&queue.iter().copied().collect())
-                                        .copied()
-                                        .collect();
-                                    !remanining_recipe.is_empty()
-                                        && remanining_recipe
-                                            .iter()
-                                            .all(|&modifier_id| owns_modifier(&stash, modifier_id))
-                                })
-                                .collect_vec()
-                        })
-                        .map(|(modifier_id, combo_priority, modifier_priority)| {
-                            (modifier_id, combo_priority + modifier_priority)
-                        })
-                        .sorted_by(|&(_, priority1), &(_, priority2)| {
-                            priority1.partial_cmp(&priority2).unwrap_or(Equal)
-                        })
-                        .map(|(modifier_id, _)| {
-                            (
-                                Some(modifier_id),
-                                MODIFIERS.by_id[&modifier_id].recipe.clone(),
-                            )
-                        })
-                        .dedup()
-                        .collect_vec();
-                    modifier_ids.extend(
-                        filler_modifiers_ids
-                            .iter()
-                            .sorted_by(|&&modifier_id1, &&modifier_id2| {
-                                Ord::cmp(
-                                    &owned_modifier_count(&stash, modifier_id1),
-                                    &owned_modifier_count(&stash, modifier_id2),
-                                )
-                                .reverse()
-                            })
-                            .filter(|&&modifier_id| owns_modifier(&stash, modifier_id))
-                            .map(|&modifier_id| (None, collection![modifier_id])),
-                    );
-
-                    info!(
-                        "trying to find a combo with queue: {:?}, modifier ids: {:?}",
-                        queue,
-                        modifier_ids
-                    );
-
-                    let mut indices = vec![-1i32];
-                    let mut suggestion: Option<(Vec<ModifierId>, f32, usize)> = None;
-                    loop {
-                        if time_before.elapsed().as_millis() > TIME_BUDGET_MS
-                            && suggestion.is_some()
-                        {
-                            break;
-                        }
-
-                        if let Some(index) = indices.pop() {
-                            if let Some((index, combo, value)) = modifier_ids
-                                .iter()
-                                .enumerate()
-                                .skip((index + 1) as usize)
-                                .find_map(|(index, (modifier_id, recipe))| {
-                                    let mut produced_modifier_ids = HashSet::<ModifierId>::new();
-                                    produced_modifier_ids.extend(get_produced_modifier_ids(&queue));
-                                    produced_modifier_ids.extend(
-                                        indices
-                                            .iter()
-                                            .filter_map(|&index| modifier_ids[index as usize].0),
-                                    );
-
-                                    if let &Some(modifier_id) = modifier_id {
-                                        produced_modifier_ids.insert(modifier_id);
-                                    }
-
-                                    let mut recipes = indices
-                                        .iter()
-                                        .map(|&index| modifier_ids[index as usize].1.clone())
-                                        .collect_vec();
-                                    recipes.push(recipe.clone());
-
-                                    let mut combo = recipes.iter().fold(
-                                        BTreeSet::<ModifierId>::new(),
-                                        |mut combo, recipe| {
-                                            combo.extend(recipe);
-                                            combo
-                                        },
-                                    );
-                                    if combo.len()
-                                        != recipes.iter().map(BTreeSet::len).sum::<usize>()
-                                    {
-                                        return None;
-                                    }
-
-                                    combo.extend(&queue);
-                                    if combo.len() > QUEUE_LENGTH {
-                                        return None;
-                                    }
-
-                                    get_unordered_combo_value(
-                                        &queue,
-                                        &combo,
-                                        &produced_modifier_ids,
-                                    )
-                                    .map(|(combo, value)| (index, combo, value))
-                                })
-                            {
-                                let filler_count = combo
-                                    .iter()
-                                    .filter(|&modifier_id| {
-                                        filler_modifiers_ids.contains(modifier_id)
-                                    })
-                                    .count();
-                                if combo.len() == QUEUE_LENGTH {
-                                    if filler_count == 0 {
-                                        suggestion = Some((combo, value, 0));
-                                        break;
-                                    }
-
-                                    if filler_count <= 2
-                                        && suggestion
-                                            .as_ref()
-                                            .filter(|&(_, value_, _)| *value_ > value)
-                                            .is_none()
-                                    {
-                                        suggestion = Some((combo, value, filler_count));
-                                    }
-                                }
-
-                                indices.push(index as i32);
-                                indices.push(index as i32);
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-
-                    // TODO if inventory is full and there aren't enough fillers, use a non filler we have an abundance of
-
-                    match suggestion {
-                        Some((ref combo, ..)) => info!("suggested combo: {:?}", combo),
-                        None => warn!("failed to suggest a combo"),
-                    }
-
-                    suggestion.map(|(suggested_combo, _, _)| suggested_combo)
-                })
-                .map(|suggested_combo| suggested_combo[queue.len()])
+            suggest_combo(user_settings, stash, queue)
         })
+        .clone()
 }

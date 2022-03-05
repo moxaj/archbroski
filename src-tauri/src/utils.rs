@@ -27,7 +27,7 @@ macro_rules! info_timed {
     ($context:literal, $expr:expr) => {{
         let timer = std::time::Instant::now();
         let value = $expr;
-        info!("operation {} took {:?}", $context, timer.elapsed());
+        info!("{} took {:?}", $context, timer.elapsed());
         value
     }};
 }
