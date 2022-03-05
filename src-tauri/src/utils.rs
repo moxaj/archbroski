@@ -23,11 +23,11 @@ macro_rules! collection {
 }
 
 #[macro_export]
-macro_rules! timed {
+macro_rules! info_timed {
     ($context:literal, $expr:expr) => {{
         let timer = std::time::Instant::now();
         let value = $expr;
-        println!("{}: {:?}", $context, timer.elapsed());
+        info!("operation {} took {:?}", $context, timer.elapsed());
         value
     }};
 }

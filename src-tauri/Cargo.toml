@@ -17,7 +17,7 @@ itertools = "0.10.3"
 once_cell = "1.9.0"
 rayon = "1.5.1"
 retry = "1.3.1"
-dashmap = { version = "5.1.0", features = ["serde"] }
+dashmap = { version = "5.1.0", features = ["serde", "rayon"] }
 serde_json = "1.0"
 bincode = "1.3.3"
 thiserror = "1.0.30"
@@ -43,7 +43,6 @@ default = [ "custom-protocol" ]
 custom-protocol = [ "tauri/custom-protocol" ]
 
 [profile.release]
-panic = "abort" # Strip expensive panic clean-up logic
-codegen-units = 1 # Compile crates one after another so the compiler can optimize better
-lto = true # Enables link to optimizations
-opt-level = "s" # Optimize for binary size
+panic = "abort"
+codegen-units = 1
+lto = true

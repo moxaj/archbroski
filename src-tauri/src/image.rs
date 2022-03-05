@@ -1,5 +1,6 @@
 use crate::logic::{ModifierId, MODIFIERS};
-use crate::{collection, Cache};
+use crate::{collection, info_timed, Cache};
+use dashmap::DashMap;
 use itertools::Itertools;
 use log::{info, warn};
 use once_cell::sync::Lazy;
@@ -19,7 +20,6 @@ use std::cmp::Ordering::Equal;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
-use std::sync::Mutex;
 use std::{collections::HashMap, ops::Deref};
 
 macro_rules! import_images {
@@ -30,7 +30,97 @@ macro_rules! import_images {
     };
 }
 
-static CELL_GROUPS: Lazy<HashMap<u8, Mutex<CellGroup>>> = Lazy::new(|| {
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Vec2 {
+    pub x: u32,
+    pub y: u32,
+}
+
+impl Vec2 {
+    pub fn new(x: u32, y: u32) -> Self {
+        Self { x, y }
+    }
+}
+
+#[derive(
+    Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug, Serialize, Deserialize,
+)]
+pub struct Rectangle {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl Rectangle {
+    pub fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
+    }
+
+    pub fn translate(&self, offset: Vec2) -> Rectangle {
+        Rectangle::new(
+            self.x + offset.x,
+            self.y + offset.y,
+            self.width,
+            self.height,
+        )
+    }
+}
+
+#[derive(Debug)]
+struct Cell {
+    tag: u8,
+    area: Rectangle,
+}
+
+struct CellGroup {
+    template: MatSync,
+    grayscale: bool,
+    area: Rectangle,
+    cell_areas: HashSet<Rectangle>,
+}
+
+struct MatSync(Mat);
+
+unsafe impl Sync for MatSync {}
+
+impl Deref for MatSync {
+    type Target = Mat;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Screenshot {
+    pub buffer: Vec<u8>,
+    pub width: usize,
+    pub height: usize,
+}
+
+impl Screenshot {
+    fn into_mat(self) -> Mat {
+        let temp_mat = Mat::from_slice(&self.buffer).unwrap();
+        let temp_mat = temp_mat.reshape(4, self.height as i32).unwrap();
+        let mut mat = Mat::default();
+        cvt_color(&temp_mat, &mut mat, COLOR_BGRA2BGR, 0).unwrap();
+        mat
+    }
+}
+
+pub struct ProcessImageResult {
+    pub stash_area: Rectangle,
+    pub stash_modifier_ids: HashMap<Rectangle, Option<ModifierId>>,
+    pub queue_modifier_ids: Vec<Option<ModifierId>>,
+}
+
+static CELL_GROUPS: Lazy<DashMap<u8, CellGroup>> = Lazy::new(|| {
     let stash = {
         let template = imdecode(
             &Vector::from_slice(include_bytes!("resources/stash_template.png")),
@@ -51,8 +141,8 @@ static CELL_GROUPS: Lazy<HashMap<u8, Mutex<CellGroup>>> = Lazy::new(|| {
                 )
             })
             .collect();
-        Mutex::new(CellGroup {
-            template,
+        CellGroup {
+            template: MatSync(template),
             grayscale: false,
             area: Rectangle::new(
                 offset.0,
@@ -61,7 +151,7 @@ static CELL_GROUPS: Lazy<HashMap<u8, Mutex<CellGroup>>> = Lazy::new(|| {
                 template_size.height as u32,
             ),
             cell_areas,
-        })
+        }
     };
     let queue = {
         let template = imdecode(
@@ -76,12 +166,12 @@ static CELL_GROUPS: Lazy<HashMap<u8, Mutex<CellGroup>>> = Lazy::new(|| {
             Rectangle::new(206, 44, 52, 52),
             Rectangle::new(289, 44, 52, 52),
         ];
-        Mutex::new(CellGroup {
-            template,
+        CellGroup {
+            template: MatSync(template),
             grayscale: true,
             area: Rectangle::new(0, 0, 0, 0),
             cell_areas,
-        })
+        }
     };
     collection![
         0 => stash,
@@ -89,7 +179,7 @@ static CELL_GROUPS: Lazy<HashMap<u8, Mutex<CellGroup>>> = Lazy::new(|| {
     ]
 });
 
-static MODIFIER_TEMPLATES: Lazy<Mutex<HashMap<&str, (Mat, Mat)>>> = Lazy::new(|| {
+static MODIFIER_TEMPLATES: Lazy<DashMap<&str, (MatSync, MatSync)>> = Lazy::new(|| {
     let modifier_templates: HashMap<_, _> = import_images!(
         "Abberath-Touched",
         "Arakaali-Touched",
@@ -155,111 +245,22 @@ static MODIFIER_TEMPLATES: Lazy<Mutex<HashMap<&str, (Mat, Mat)>>> = Lazy::new(||
         "Tukohama-Touched",
         "Vampiric"
     );
-    Mutex::new(
-        modifier_templates
-            .into_iter()
-            .map(|(modifier_name, modifier_template)| {
-                let modifier_template =
-                    imdecode(&Vector::from_slice(&modifier_template), IMREAD_COLOR).unwrap();
-                let modifier_template_grayscale = to_grayscale(&modifier_template);
+    modifier_templates
+        .into_iter()
+        .map(|(modifier_name, modifier_template)| {
+            let modifier_template =
+                imdecode(&Vector::from_slice(&modifier_template), IMREAD_COLOR).unwrap();
+            let modifier_template_grayscale = to_grayscale(&modifier_template);
+            (
+                modifier_name,
                 (
-                    modifier_name,
-                    (modifier_template, modifier_template_grayscale),
-                )
-            })
-            .collect(),
-    )
+                    MatSync(modifier_template),
+                    MatSync(modifier_template_grayscale),
+                ),
+            )
+        })
+        .collect()
 });
-
-#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Vec2 {
-    pub x: u32,
-    pub y: u32,
-}
-
-impl Vec2 {
-    pub fn new(x: u32, y: u32) -> Self {
-        Self { x, y }
-    }
-}
-
-#[derive(
-    Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Debug, Serialize, Deserialize,
-)]
-pub struct Rectangle {
-    pub x: u32,
-    pub y: u32,
-    pub width: u32,
-    pub height: u32,
-}
-
-impl Rectangle {
-    pub fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
-        Self {
-            x,
-            y,
-            width,
-            height,
-        }
-    }
-
-    pub fn translate(&self, offset: Vec2) -> Rectangle {
-        Rectangle::new(
-            self.x + offset.x,
-            self.y + offset.y,
-            self.width,
-            self.height,
-        )
-    }
-}
-
-#[derive(Debug)]
-struct Cell {
-    tag: u8,
-    area: Rectangle,
-}
-
-struct CellGroup {
-    template: Mat,
-    grayscale: bool,
-    area: Rectangle,
-    cell_areas: HashSet<Rectangle>,
-}
-
-struct MatSync(Mat);
-
-unsafe impl Sync for MatSync {}
-
-impl Deref for MatSync {
-    type Target = Mat;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Screenshot {
-    pub buffer: Vec<u8>,
-    pub width: usize,
-    pub height: usize,
-}
-
-impl Screenshot {
-    fn into_mat(self) -> Mat {
-        let temp_mat = Mat::from_slice(&self.buffer).unwrap();
-        let temp_mat = temp_mat.reshape(4, self.height as i32).unwrap();
-        let mut mat = Mat::default();
-        cvt_color(&temp_mat, &mut mat, COLOR_BGRA2BGR, 0).unwrap();
-        mat
-    }
-}
-
-pub struct ProcessImageResult {
-    pub stash_area: Rectangle,
-    pub stash_modifier_ids: HashMap<Rectangle, Option<ModifierId>>,
-    pub queue_modifier_ids: Vec<Option<ModifierId>>,
-}
 
 fn to_grayscale(image: &Mat) -> Mat {
     let mut image_grayscale = Mat::default();
@@ -353,10 +354,11 @@ fn match_template(source: &Mat, template: &Mat) -> (Vec2, f32) {
     )
 }
 
-fn get_layout(cache: &mut Cache, screenshot: &Mat) -> Option<HashMap<u8, Vec2>> {
+fn get_layout(cache: &mut Cache, screenshot: &MatSync) -> Option<HashMap<u8, Vec2>> {
     let layout_matches = |layout: &&HashMap<u8, Vec2>| {
-        CELL_GROUPS.iter().all(|(&tag, cell_group)| {
-            let cell_group = cell_group.lock().unwrap();
+        CELL_GROUPS.par_iter_mut().all(|entry| {
+            let tag = *entry.key();
+            let cell_group = &*entry;
             let cell_group_offset = layout[&tag];
             let cell_group_template_size = cell_group.template.size().unwrap();
             let source = Mat::rowscols(
@@ -379,9 +381,10 @@ fn get_layout(cache: &mut Cache, screenshot: &Mat) -> Option<HashMap<u8, Vec2>> 
     if cache.layout.as_ref().filter(layout_matches).is_none() {
         if let Some(layout) = {
             let layout: HashMap<_, _> = CELL_GROUPS
-                .iter()
-                .filter_map(|(&tag, cell_group)| {
-                    let cell_group = cell_group.lock().unwrap();
+                .par_iter_mut()
+                .filter_map(|entry| {
+                    let tag = *entry.key();
+                    let cell_group = &*entry;
                     let (offset, score) = match_template(screenshot, &cell_group.template);
                     if score.is_normal() && score > 0.95 {
                         Some((tag, offset))
@@ -394,7 +397,6 @@ fn get_layout(cache: &mut Cache, screenshot: &Mat) -> Option<HashMap<u8, Vec2>> 
                 None
             } else {
                 cache.modified = true;
-
                 Some(layout)
             }
         } {
@@ -414,8 +416,9 @@ fn get_layout(cache: &mut Cache, screenshot: &Mat) -> Option<HashMap<u8, Vec2>> 
 fn get_cells(layout: &HashMap<u8, Vec2>) -> Vec<Cell> {
     CELL_GROUPS
         .iter()
-        .flat_map(|(&tag, cell_group)| {
-            let cell_group = cell_group.lock().unwrap();
+        .flat_map(|entry| {
+            let tag = *entry.key();
+            let cell_group = &*entry;
             let cell_group_offset = layout[&tag];
             cell_group
                 .cell_areas
@@ -430,7 +433,7 @@ fn get_cells(layout: &HashMap<u8, Vec2>) -> Vec<Cell> {
 }
 
 fn get_modifier_id(
-    cache: &mut Cache,
+    cache_images: &DashMap<u64, Option<ModifierId>>,
     screenshot: &Mat,
     cell: &Cell,
     grayscale: bool,
@@ -442,8 +445,7 @@ fn get_modifier_id(
     )
     .unwrap();
     let cell_image_grayscale = to_grayscale(&cell_image);
-    let modifier_id = *cache
-        .images
+    let modifier_id = *cache_images
         .entry(hash_image(&crop_image(&cell_image, 10)))
         .or_insert_with(|| {
             let (modifier_id, score) = MODIFIERS
@@ -451,7 +453,7 @@ fn get_modifier_id(
                 .values()
                 .map(|modifier| {
                     let (template, template_grayscale) =
-                        &MODIFIER_TEMPLATES.lock().unwrap()[modifier.name.as_str()];
+                        &*MODIFIER_TEMPLATES.get(modifier.name.as_str()).unwrap();
                     (
                         modifier.id,
                         match_template(
@@ -472,7 +474,6 @@ fn get_modifier_id(
                 .max_by(|&(_, score1), &(_, score2)| score1.partial_cmp(&score2).unwrap_or(Equal))
                 .unwrap();
             if score.is_normal() && score > 0.8 {
-                cache.modified = true;
                 Some(modifier_id)
             } else {
                 None
@@ -483,30 +484,32 @@ fn get_modifier_id(
 }
 
 pub fn process_image(cache: &mut Cache, screenshot: Screenshot) -> Option<ProcessImageResult> {
-    let screenshot = screenshot.into_mat();
-    let screenshot_sync = MatSync(screenshot.clone());
-    get_layout(cache, &screenshot).map(|layout| {
+    let screenshot = MatSync(screenshot.into_mat());
+    info_timed!("get_layout", get_layout(cache, &screenshot)).map(|layout| {
         let cells = get_cells(&layout);
-        let cache_mutex = Mutex::new(cache);
-        let modifier_ids = cells
-            .into_par_iter()
-            .map(|cell| {
-                let grayscale = CELL_GROUPS[&cell.tag].lock().unwrap().grayscale;
-                (
-                    cell.tag,
-                    cell.area,
-                    get_modifier_id(
-                        &mut cache_mutex.lock().unwrap(),
-                        &screenshot_sync,
-                        &cell,
-                        grayscale,
-                    ),
-                )
-            })
-            .collect::<Vec<_>>();
+        let cache_images = &cache.images;
+        let cache_images_count = cache_images.len();
+        let modifier_ids = info_timed!(
+            "match cells",
+            cells
+                .into_par_iter()
+                .map(|cell| {
+                    let grayscale = CELL_GROUPS.get(&cell.tag).unwrap().grayscale;
+                    (
+                        cell.tag,
+                        cell.area,
+                        get_modifier_id(cache_images, &screenshot, &cell, grayscale),
+                    )
+                })
+                .collect::<Vec<_>>()
+        );
+        if cache_images.len() > cache_images_count {
+            cache.modified = true;
+        }
+
         let modifier_ids_by_tags = modifier_ids.iter().into_group_map_by(|&&(tag, _, _)| tag);
         ProcessImageResult {
-            stash_area: CELL_GROUPS[&0].lock().unwrap().area.translate(layout[&0]),
+            stash_area: CELL_GROUPS.get(&0).unwrap().area.translate(layout[&0]),
             stash_modifier_ids: modifier_ids_by_tags
                 .get(&0u8)
                 .unwrap_or(&Vec::new())
