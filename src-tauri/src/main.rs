@@ -37,7 +37,7 @@ use windows::Win32::{
     Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_TRANSITIONS_FORCEDISABLED},
 };
 
-const IGNORE_CACHE: bool = true;
+const IGNORE_CACHE: bool = false;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Cache {
