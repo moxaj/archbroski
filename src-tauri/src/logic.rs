@@ -514,7 +514,8 @@ pub fn suggest_modifier_id(
                     );
 
                     info!(
-                        "trying to find a combo with modifier ids: {:?}",
+                        "trying to find a combo with queue: {:?}, modifier ids: {:?}",
+                        queue,
                         modifier_ids
                     );
 

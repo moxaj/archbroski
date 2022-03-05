@@ -72,6 +72,19 @@ impl Rectangle {
     }
 }
 
+/// https://github.com/twistedfall/opencv-rust/issues/324
+struct MatSync(Mat);
+
+unsafe impl Sync for MatSync {}
+
+impl Deref for MatSync {
+    type Target = Mat;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(Debug)]
 struct Cell {
     tag: u8,
@@ -83,18 +96,6 @@ struct CellGroup {
     grayscale: bool,
     area: Rectangle,
     cell_areas: HashSet<Rectangle>,
-}
-
-struct MatSync(Mat);
-
-unsafe impl Sync for MatSync {}
-
-impl Deref for MatSync {
-    type Target = Mat;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
 }
 
 #[derive(Clone, Debug)]
