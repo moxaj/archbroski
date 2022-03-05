@@ -419,47 +419,54 @@ pub fn suggest_modifier_id(
                         .enumerate()
                         .map(|(combo_index, combo)| ((combo_index as f32 + 1.0), combo))
                         .flat_map(|(combo_priority, combo)| {
-                            combo
+                            let mut required_modifier_ids = HashMap::new();
+                            for modifier_id in combo {
+                                required_modifier_ids.insert(*modifier_id, 1);
+                                required_modifier_ids = MODIFIERS.components[modifier_id]
+                                    .iter()
+                                    .fold(
+                                    required_modifier_ids,
+                                    |mut required_modifier_ids, (&modifier_id, &modifier_id_count)| {
+                                        *required_modifier_ids.entry(modifier_id).or_default() +=
+                                            modifier_id_count;
+                                        required_modifier_ids
+                                    },
+                                );
+                            }
+
+                            let mut owned_modifier_ids = HashMap::new();
+                            let mut modifier_ids = combo
                                 .iter()
-                                .flat_map(|&modifier_id| {
-                                    let required_modifier_ids = &MODIFIERS.components[&modifier_id];
-                                    let mut owned_modifier_ids = HashMap::new();
+                                .map(|&modifier_id| (modifier_id, 0))
+                                .collect::<VecDeque<_>>();
+                            while let Some((modifier_id, parent_count)) = modifier_ids.pop_front() {
+                                let owned_count =
+                                    owned_modifier_ids.entry(modifier_id).or_insert_with(|| {
+                                        stash.get(&modifier_id).copied().unwrap_or_default()
+                                    });
+                                *owned_count += parent_count;
 
-                                    let mut modifier_ids: VecDeque<_> =
-                                        collection![(modifier_id, 0)];
-                                    while let Some((modifier_id, parent_count)) =
-                                        modifier_ids.pop_front()
-                                    {
-                                        let owned_count = owned_modifier_ids
-                                            .entry(modifier_id)
-                                            .or_insert_with(|| {
-                                                stash.get(&modifier_id).copied().unwrap_or_default()
-                                            });
-                                        *owned_count += parent_count;
-
-                                        modifier_ids.extend(
-                                            MODIFIERS.by_id[&modifier_id]
-                                                .recipe
-                                                .iter()
-                                                .map(|&modifier_id| (modifier_id, *owned_count)),
-                                        );
-                                    }
-
-                                    required_modifier_ids
+                                modifier_ids.extend(
+                                    MODIFIERS.by_id[&modifier_id]
+                                        .recipe
                                         .iter()
-                                        .map(|(&modifier_id, &required_count)| {
-                                            (
-                                                modifier_id,
-                                                combo_priority as f32,
-                                                (owned_modifier_ids
-                                                    .get(&modifier_id)
-                                                    .copied()
-                                                    .unwrap_or_default()
-                                                    as f32)
-                                                    / (required_count as f32),
-                                            )
-                                        })
-                                        .collect_vec()
+                                        .map(|&modifier_id| (modifier_id, *owned_count)),
+                                );
+                            }
+
+                            required_modifier_ids
+                                .iter()
+                                .map(|(&modifier_id, &required_count)| {
+                                    (
+                                        modifier_id,
+                                        combo_priority as f32,
+                                        (owned_modifier_ids
+                                            .get(&modifier_id)
+                                            .copied()
+                                            .unwrap_or_default()
+                                            as f32)
+                                            / (required_count as f32),
+                                    )
                                 })
                                 .filter(|(modifier_id, _, _)| {
                                     let recipe = MODIFIERS.by_id[modifier_id].recipe.clone();
@@ -490,6 +497,7 @@ pub fn suggest_modifier_id(
                                 MODIFIERS.by_id[&modifier_id].recipe.clone(),
                             )
                         })
+                        .dedup()
                         .collect_vec();
                     modifier_ids.extend(
                         filler_modifiers_ids
