@@ -19,8 +19,7 @@ Approach an archnemesis statue and click its icon. Once the UI is visible, press
  - __b__, the image recognition algorithm fails, indicated by a __red explamation point__. For why this might have happened, read through the `IMPORTANT` points below
  - __c__, the logic algorithm fails, indicated by a __red question mark__. Read the [Logic algorithm](#logic-algorithm) section to understand why this might have happened.
 
-Whatever happens, you can close the overlay by pressing any key or mouse button. Also, the very first activation after installation could take a few seconds,
-but subsequent activations should (eventually) be reasonably fast (< 100ms).
+Whatever happens, you can close the overlay by pressing any key or mouse button. Also, the very first activation after installation could take some time (~1 second on my system), but subsequent activations should be reasonably fast (< 100ms).
 
 > __IMPORTANT__
 > 
