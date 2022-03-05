@@ -37,12 +37,22 @@ use windows::Win32::{
     Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_TRANSITIONS_FORCEDISABLED},
 };
 
+const IGNORE_CACHE: bool = true;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Cache {
     pub modified: bool,
     pub layout: Option<HashMap<u8, Vec2>>,
     pub images: DashMap<u64, Option<ModifierId>>,
     pub suggested_modifier_ids: HashMap<u64, Option<ModifierId>>,
+}
+
+impl Cache {
+    fn clear(&mut self) {
+        self.layout = None;
+        self.images.clear();
+        self.suggested_modifier_ids.clear();
+    }
 }
 
 impl DiscSynchronized for Cache {
@@ -223,7 +233,7 @@ fn activate(app: &tauri::AppHandle) {
             id: activation_state.0,
         };
         let activation_id = activation_state.0;
-        info!("activated with id: {:?}", activation_id);
+        info!("trying to activate with id: {:?}", activation_id);
         app.get_window("overlay")
             .unwrap()
             .emit("update", activation_state.1)
@@ -260,6 +270,10 @@ fn activate(app: &tauri::AppHandle) {
                     let cache_state = app.state::<Result<Mutex<Cache>, &'static str>>();
                     let mut cache = cache_state.as_ref().unwrap().lock().unwrap();
                     cache.modified = false;
+                    if IGNORE_CACHE {
+                        cache.clear();
+                    }
+
                     process_image(
                         &mut cache,
                         Screenshot {
