@@ -376,7 +376,7 @@ fn get_layout(cache: &mut Cache, screenshot: &MatSync) -> Option<HashMap<u8, Vec
                 .unwrap(),
             )
             .unwrap();
-            match_template(&source, &cell_group.template).1 > 0.98
+            match_template(&source, &cell_group.template).1 > 0.95
         })
     };
     if cache.layout.as_ref().filter(layout_matches).is_none() {
