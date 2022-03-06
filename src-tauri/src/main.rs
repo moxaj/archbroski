@@ -257,7 +257,7 @@ fn activate(app: &tauri::AppHandle) {
                     })
                 })
                 .and_then(|mut capturer| {
-                    retry(Fixed::from_millis(20).take(10), || {
+                    retry(Fixed::from_millis(50).take(10), || {
                         let capturer_width = capturer.width();
                         let capturer_height = capturer.height();
                         capturer
