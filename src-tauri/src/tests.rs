@@ -26,7 +26,7 @@ fn get_suggested_combo(
             combo_roster: (0..combos.len() as u64).collect_vec(),
             forbidden_modifier_ids,
             hotkey: "".into(),
-            show_tiers: false
+            show_tiers: false,
         },
         &stash,
         &queue,
@@ -108,6 +108,6 @@ fn recipe_with_fillers() {
     );
     assert!(combo.is_some());
     let combo = combo.unwrap();
-    assert_eq!(true, combo.iter().collect::<HashSet<_>>().contains(&5));
-    assert_eq!(true, combo.iter().collect::<HashSet<_>>().contains(&20));
+    assert!(combo.iter().collect::<HashSet<_>>().contains(&5));
+    assert!(combo.iter().collect::<HashSet<_>>().contains(&20));
 }

@@ -370,7 +370,7 @@ fn get_unordered_combo_value(
 fn suggest_active_combo(
     user_settings: &UserSettings,
     stash: &BTreeMap<ModifierId, usize>,
-    queue: &Vec<ModifierId>,
+    queue: &[ModifierId],
 ) -> Option<Vec<ModifierId>> {
     user_settings
         .combo_roster
@@ -388,7 +388,7 @@ fn suggest_active_combo(
                 && combo
                     .iter()
                     .skip(queue.len())
-                    .all(|&modifier_id| owns_modifier(&stash, modifier_id))
+                    .all(|&modifier_id| owns_modifier(stash, modifier_id))
         })
         .cloned()
         .map(|combo| {
@@ -400,7 +400,7 @@ fn suggest_active_combo(
 fn suggest_custom_combo(
     user_settings: &UserSettings,
     stash: &BTreeMap<ModifierId, usize>,
-    queue: &Vec<ModifierId>,
+    queue: &[ModifierId],
 ) -> Option<Vec<ModifierId>> {
     let filler_modifiers_ids = user_settings.get_filler_modifier_ids();
     let usable_modifier_ids = user_settings
@@ -473,7 +473,7 @@ fn suggest_custom_combo(
                     !remanining_recipe.is_empty()
                         && remanining_recipe
                             .iter()
-                            .all(|&modifier_id| owns_modifier(&stash, modifier_id))
+                            .all(|&modifier_id| owns_modifier(stash, modifier_id))
                 })
                 .collect_vec()
         })
@@ -495,12 +495,12 @@ fn suggest_custom_combo(
                 .iter()
                 .sorted_by(|&&modifier_id1, &&modifier_id2| {
                     Ord::cmp(
-                        &owned_modifier_count(&stash, modifier_id1),
-                        &owned_modifier_count(&stash, modifier_id2),
+                        &owned_modifier_count(stash, modifier_id1),
+                        &owned_modifier_count(stash, modifier_id2),
                     )
                     .reverse()
                 })
-                .filter(|&&modifier_id| owns_modifier(&stash, modifier_id))
+                .filter(|&&modifier_id| owns_modifier(stash, modifier_id))
                 .map(|&modifier_id| (None, collection![modifier_id])),
         )
         .collect_vec();
@@ -520,7 +520,7 @@ fn suggest_custom_combo(
                 .skip((index + 1) as usize)
                 .find_map(|(index, (modifier_id, recipe))| {
                     let mut produced_modifier_ids = HashSet::<ModifierId>::new();
-                    produced_modifier_ids.extend(get_produced_modifier_ids(&queue));
+                    produced_modifier_ids.extend(get_produced_modifier_ids(queue));
                     produced_modifier_ids.extend(
                         indices
                             .iter()
@@ -553,7 +553,7 @@ fn suggest_custom_combo(
                         return None;
                     }
 
-                    get_unordered_combo_value(&queue, &combo, &produced_modifier_ids)
+                    get_unordered_combo_value(queue, &combo, &produced_modifier_ids)
                         .map(|(combo, value)| (index, combo, value))
                 })
             {
@@ -595,14 +595,14 @@ fn suggest_custom_combo(
 pub fn suggest_combo(
     user_settings: &UserSettings,
     stash: &BTreeMap<ModifierId, usize>,
-    queue: &Vec<ModifierId>,
+    queue: &[ModifierId],
 ) -> Option<Vec<ModifierId>> {
     if queue.len() == 4 {
         warn!("cannot suggest a combo with 4 queued modifiers");
         None
     } else {
-        suggest_active_combo(user_settings, &stash, &queue)
-            .or_else(|| suggest_custom_combo(user_settings, &stash, &queue))
+        suggest_active_combo(user_settings, stash, queue)
+            .or_else(|| suggest_custom_combo(user_settings, stash, queue))
             .or_else(|| {
                 warn!("failed to suggest a combo");
                 None
@@ -614,7 +614,7 @@ pub fn suggest_combo_cached(
     cache: &mut Cache,
     user_settings: &UserSettings,
     stash: &BTreeMap<ModifierId, usize>,
-    queue: &Vec<ModifierId>,
+    queue: &[ModifierId],
 ) -> Option<Vec<ModifierId>> {
     let mut hasher = DefaultHasher::new();
     (user_settings, stash, queue).hash(&mut hasher);
