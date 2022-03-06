@@ -181,6 +181,7 @@ pub struct UserSettings {
     pub combo_roster: Vec<ComboId>,
     pub forbidden_modifier_ids: BTreeSet<ModifierId>,
     pub hotkey: String,
+    pub show_tiers: bool,
 }
 
 impl UserSettings {
@@ -221,6 +222,7 @@ impl DiscSynchronized for UserSettings {
             combo_roster: vec![0, 1],
             forbidden_modifier_ids: collection![54, 55, 56, 59, 61, 62],
             hotkey: "alt + 1".to_owned(),
+            show_tiers: false,
         }
     }
 

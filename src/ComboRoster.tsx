@@ -1,7 +1,7 @@
 import React from 'react';
 import { TransitionGroup } from 'react-transition-group';
-import { Info, Lock, Star } from '@mui/icons-material';
-import { Box, Typography, Chip, Divider, Zoom, Tooltip, FormControlLabel, Switch, Fade } from '@mui/material';
+import { Lock, Star, SyncAlt } from '@mui/icons-material';
+import { Box, Typography, Chip, Divider, Zoom, FormControlLabel, Switch, Fade } from '@mui/material';
 import { UserSettings, Modifiers, LabeledCombo } from './Settings';
 import WithLoading from './WithLoading';
 import { numberKeys } from '.';
@@ -107,11 +107,24 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                 ? 0.2
                 : 1;
     };
-    const [showTiers, setShowTiers] = React.useState(false);
+    const setShowTiers = (showTiers: boolean) => {
+        setUserSettings(userSettings => (
+            {
+                ...userSettings!,
+                showTiers
+            }
+        ));
+    };
     return (
         <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
             <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ position: 'relative', width: 1, height: 300, display: 'flex' }}>
+                    <SyncAlt color='primary' sx={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%) scale(75%)'
+                    }} />
                     <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
                         <Box sx={{ flex: 1, height: 1, mx: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                             <Typography variant='body2' sx={{ width: 150, my: 1, textTransform: 'uppercase', textAlign: 'center' }}>
@@ -166,9 +179,6 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                             </Droppable>
                         </Box>
                     </DragDropContext>
-                    <Tooltip title='Drag & drop combos to (de)activate them or modify their priorities.'>
-                        <Info sx={{ position: 'absolute', right: 0, bottom: 0, m: 1 }} />
-                    </Tooltip>
                 </Box>
                 <Divider />
                 <Box sx={{ width: 1, flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -196,14 +206,14 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                                                         zIndex: 1
                                                     }} />
                                                 </Zoom>
-                                                <Fade in={showTiers}>
+                                                <Fade in={userSettings.showTiers}>
                                                     <Box sx={{
                                                         position: 'absolute', top: 0, left: '50%',
                                                         transform: 'translate(-50%, -40%) scale(0.3)',
                                                         display: 'flex'
                                                     }}>
                                                         {[...Array(modifierTier(modifierId))].map((_, index) => (
-                                                            <Star key={index} />
+                                                            <Star key={index} color='secondary' />
                                                         ))}
                                                     </Box>
                                                 </Fade>
@@ -222,7 +232,7 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                 </Box>
                 <Box sx={{ width: 1, display: 'flex', alignItems: 'center' }}>
                     <FormControlLabel
-                        control={<Switch checked={showTiers} onChange={event => setShowTiers(event.target.checked)} />}
+                        control={<Switch checked={userSettings.showTiers} onChange={event => setShowTiers(event.target.checked)} />}
                         label="Show tiers" />
                 </Box>
             </Box >

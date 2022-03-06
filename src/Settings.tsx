@@ -30,6 +30,7 @@ export type UserSettings = {
     comboRoster: number[];
     forbiddenModifierIds: number[];
     hotkey: string;
+    showTiers: boolean;
 };
 
 const Settings = () => {
