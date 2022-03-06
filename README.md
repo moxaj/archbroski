@@ -4,7 +4,9 @@ __archbroski__ is a 3rd party tool for Path of Exile which suggests archnemesis 
 
 ## Installation
 
-Install the program using the installer downloaded from [here](https://github.com/moxaj/archbroski/releases).
+This is work in progress, but for now, download the zipfile from [here](https://github.com/moxaj/archbroski/releases), and unzip into any (writable) directory.
+
+In the future, I might be able to provide a digitally signed windows installer.
 
 ## Configuration
 
@@ -28,7 +30,7 @@ Whatever happens, you can close the overlay by pressing any key or mouse button.
 >    - your stash, queue, and their immediate surroundings (~ 50 pixels around) > should be __fully visible and unobstructed__
 >     by anything (including your cursor!)
 >    - do __NOT__ have any recipe from the drop down list selected or have any text in the search textfield
->    - do __NOT__ move your cursor around too much - for some obscure reason, the app won't be able to take a screenshot
+>    - do __NOT__ move your cursor at all when activating - for some obscure reason, the app won't be able to take a screenshot
 > 3. if, for any reason, your UI differs in size, or you use anything akin to Reshade, SweetFX, NVIDIA Freestyle, etc.,
 the image recognition is __very likely to fail__ (fail to recognize the layout or misidentify the modifiers)
 
