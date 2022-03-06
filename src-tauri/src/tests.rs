@@ -26,6 +26,7 @@ fn get_suggested_combo(
             combo_roster: (0..combos.len() as u64).collect_vec(),
             forbidden_modifier_ids,
             hotkey: "".into(),
+            show_tiers: false
         },
         &stash,
         &queue,
