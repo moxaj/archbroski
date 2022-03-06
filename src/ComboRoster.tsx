@@ -1,7 +1,7 @@
 import React from 'react';
 import { TransitionGroup } from 'react-transition-group';
-import { Info, Lock } from '@mui/icons-material';
-import { Box, Typography, Chip, Divider, Zoom, Tooltip } from '@mui/material';
+import { Info, Lock, Star } from '@mui/icons-material';
+import { Box, Typography, Chip, Divider, Zoom, Tooltip, FormControlLabel, Switch, Fade } from '@mui/material';
 import { UserSettings, Modifiers, LabeledCombo } from './Settings';
 import WithLoading from './WithLoading';
 import { numberKeys } from '.';
@@ -20,28 +20,6 @@ const comboLabel = ({ label, id }: LabeledCombo) => {
 };
 const getUsedModifierIds = (modifiers: Modifiers, modifierId: number): number[] =>
     [modifierId, ...modifiers.byId[modifierId].recipe.flatMap(modifierId_ => getUsedModifierIds(modifiers, modifierId_))];
-
-const ModifierTierTicks = ({ tier }: { tier: number }) => {
-    return (
-        <>
-            {[...Array(tier)].map((_, index) => {
-                const u = (tier - 1) * -0.5 + index;
-                return (
-                    <Box key={index} sx={{
-                        position: 'absolute',
-                        top: 5,
-                        left: `calc(50% + ${u * 4}px)`,
-                        width: '2px',
-                        height: '4px',
-                        backgroundColor: 'white',
-                        transform: 'translate(-50%, -50%)'
-                    }}>
-                    </Box>
-                )
-            })}
-        </>
-    )
-};
 
 const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterProps) => {
     const toggleForbiddenModifierId = (modifierId: number) => {
@@ -129,10 +107,11 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                 ? 0.2
                 : 1;
     };
+    const [showTiers, setShowTiers] = React.useState(false);
     return (
         <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
             <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
-                <Box sx={{ position: 'relative', width: 1, height: 360, display: 'flex' }}>
+                <Box sx={{ position: 'relative', width: 1, height: 300, display: 'flex' }}>
                     <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
                         <Box sx={{ flex: 1, height: 1, mx: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                             <Typography variant='body2' sx={{ width: 150, my: 1, textTransform: 'uppercase', textAlign: 'center' }}>
@@ -141,7 +120,7 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                             <Droppable droppableId='unused'>
                                 {provided =>
                                     <Box ref={provided.innerRef} {...provided.droppableProps}
-                                        sx={{ width: 150, height: 320, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                        sx={{ width: 150, height: 280, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                                         {
                                             unusedComboIds.map((comboId, comboIndex) => (
                                                 <Draggable key={comboId} draggableId={'' + comboId} index={comboIndex}>
@@ -167,7 +146,7 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                             <Droppable droppableId='used'>
                                 {provided =>
                                     <Box ref={provided.innerRef} {...provided.droppableProps}
-                                        sx={{ width: 150, height: 320, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                        sx={{ width: 150, height: 280, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
                                         {
                                             userSettings.comboRoster.map((comboId, comboIndex) => (
@@ -187,7 +166,7 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                             </Droppable>
                         </Box>
                     </DragDropContext>
-                    <Tooltip title='Drag & drop combos to (de)active them and modify their priorities.'>
+                    <Tooltip title='Drag & drop combos to (de)activate them or modify their priorities.'>
                         <Info sx={{ position: 'absolute', right: 0, bottom: 0, m: 1 }} />
                     </Tooltip>
                 </Box>
@@ -213,10 +192,21 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                                                 <Zoom in={userSettings!.forbiddenModifierIds.includes(modifierId)}>
                                                     <Lock sx={{
                                                         position: 'absolute', right: 0, top: 0, fontSize: '14px',
-                                                        transform: 'translateX(20%)'
+                                                        transform: 'translateX(20%)',
+                                                        zIndex: 1
                                                     }} />
                                                 </Zoom>
-                                                <ModifierTierTicks tier={modifierTier(modifierId)} />
+                                                <Fade in={showTiers}>
+                                                    <Box sx={{
+                                                        position: 'absolute', top: 0, left: '50%',
+                                                        transform: 'translate(-50%, -40%) scale(0.3)',
+                                                        display: 'flex'
+                                                    }}>
+                                                        {[...Array(modifierTier(modifierId))].map((_, index) => (
+                                                            <Star key={index} />
+                                                        ))}
+                                                    </Box>
+                                                </Fade>
                                                 <Chip
                                                     size='small'
                                                     label={modifier.name}
@@ -229,6 +219,11 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                             })}
                         </TransitionGroup>
                     </Box>
+                </Box>
+                <Box sx={{ width: 1, display: 'flex', alignItems: 'center' }}>
+                    <FormControlLabel
+                        control={<Switch checked={showTiers} onChange={event => setShowTiers(event.target.checked)} />}
+                        label="Show tiers" />
                 </Box>
             </Box >
         </WithLoading >

@@ -192,7 +192,7 @@ const ComboCatalog = ({ userSettings, setUserSettings, modifiers }: ComboCatalog
                         </TableBody>
                     </Table>
                 </TableContainer>
-                <Fade in={userSettings.comboCatalog.length < 10}>
+                <Fade in={userSettings.comboCatalog.length < 8}>
                     <IconButton sx={{ alignSelf: 'center' }} onClick={() => { addCombo(); }}>
                         <Add />
                     </IconButton>

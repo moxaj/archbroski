@@ -32,7 +32,7 @@ const HelpDialog = ({ open, onClose }: HelpDialogProps) => {
             </DialogTitle>
             <DialogContent>
                 <DialogContentText>
-                    On the catalog tab, you may define up to 10 combos. On the roster tab, select which ones you'd like to have
+                    On the catalog tab, you may define up to 8 combos. On the roster tab, select which ones you'd like to have
                     as active combos. When you activate <b>archbroski</b>, it'll try to progress towards the active ones;
                     topmost with the highest, bottommost with the lowest priority.<br />
                     <br />
@@ -72,10 +72,10 @@ const ComboSettings = ({ userSettings, setUserSettings, modifiers }: ComboSettin
                             <Tab label='Catalog' value={'catalog'} />
                             <Tab label='Roster' value={'roster'} />
                         </Tabs>
-                        <TabPanel value={'catalog'} sx={{ pt: 0 }}>
+                        <TabPanel value={'catalog'} sx={{ flexGrow: 1, pt: 0 }}>
                             <ComboCatalog userSettings={userSettings} setUserSettings={setUserSettings} modifiers={modifiers} />
                         </TabPanel>
-                        <TabPanel value={'roster'} sx={{ pt: 0 }}>
+                        <TabPanel value={'roster'} sx={{ flexGrow: 1, pt: 0 }}>
                             <ComboRoster userSettings={userSettings} setUserSettings={setUserSettings} modifiers={modifiers} />
                         </TabPanel>
                     </Box>
