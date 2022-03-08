@@ -126,77 +126,86 @@ fn init_logger() {
 }
 
 fn create_settings_window(app: &tauri::AppHandle) {
-    app.create_window(
-        "settings",
-        tauri::WindowUrl::App("index.html".into()),
-        move |window_builder, attributes| {
-            (
-                window_builder
-                    .title("Archbroski")
-                    .inner_size(1400f64, 700f64)
-                    .decorations(false)
-                    .resizable(false)
-                    .visible(false)
-                    .center(),
-                attributes,
-            )
-        },
-    )
-    .unwrap();
-}
-
-fn create_overlay_window(app: &tauri::AppHandle) {
-    let overlay_window = app
-        .create_window(
-            "overlay",
+    let app_ = app.clone();
+    tauri::async_runtime::spawn(async move {
+        app_.create_window(
+            "settings",
             tauri::WindowUrl::App("index.html".into()),
             move |window_builder, attributes| {
                 (
                     window_builder
-                        .resizable(false)
+                        .title("Archbroski")
+                        .inner_size(1400f64, 700f64)
                         .decorations(false)
-                        .transparent(true)
+                        .resizable(false)
                         .visible(false)
-                        .always_on_top(true)
-                        .position(0f64, 0f64)
-                        .skip_taskbar(true),
+                        .center(),
                     attributes,
                 )
             },
         )
         .unwrap();
+    });
+}
 
-    if cfg!(target_os = "windows") {
-        if let Ok(hwnd) = overlay_window.hwnd() {
-            unsafe {
-                let _ = DwmSetWindowAttribute(
-                    std::mem::transmute::<*mut c_void, HWND>(hwnd),
-                    DWMWA_TRANSITIONS_FORCEDISABLED,
-                    &mut BOOL::from(true) as *mut _ as *mut c_void,
-                    std::mem::size_of::<BOOL>() as u32,
-                );
+fn create_overlay_window(app: &tauri::AppHandle) {
+    let app_ = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let overlay_window = app_
+            .create_window(
+                "overlay",
+                tauri::WindowUrl::App("index.html".into()),
+                move |window_builder, attributes| {
+                    (
+                        window_builder
+                            .resizable(false)
+                            .decorations(false)
+                            .transparent(true)
+                            .visible(false)
+                            .always_on_top(true)
+                            .position(0f64, 0f64)
+                            .skip_taskbar(true),
+                        attributes,
+                    )
+                },
+            )
+            .unwrap();
+
+        if cfg!(target_os = "windows") {
+            if let Ok(hwnd) = overlay_window.hwnd() {
+                unsafe {
+                    let _ = DwmSetWindowAttribute(
+                        std::mem::transmute::<*mut c_void, HWND>(hwnd),
+                        DWMWA_TRANSITIONS_FORCEDISABLED,
+                        &mut BOOL::from(true) as *mut _ as *mut c_void,
+                        std::mem::size_of::<BOOL>() as u32,
+                    );
+                }
             }
         }
-    }
+    });
 }
 
 fn create_error_window(app: &tauri::AppHandle) {
-    app.create_window(
-        "error",
-        tauri::WindowUrl::App("index.html".into()),
-        move |window_builder, attributes| {
-            (
-                window_builder
-                    .decorations(false)
-                    .resizable(false)
-                    .visible(false)
-                    .inner_size(500f64, 250f64)
-                    .center(),
-                attributes,
-            )
-        },
-    )
-    .unwrap();
+    let app_ = app.clone();
+    tauri::async_runtime::spawn(async move {
+        app_.create_window(
+            "error",
+            tauri::WindowUrl::App("index.html".into()),
+            move |window_builder, attributes| {
+                (
+                    window_builder
+                        .decorations(false)
+                        .resizable(false)
+                        .visible(false)
+                        .inner_size(500f64, 250f64)
+                        .center(),
+                    attributes,
+                )
+            },
+        )
+        .unwrap();
+    });
 }
 
 fn set_initial_hotkey(app: &tauri::AppHandle) {
