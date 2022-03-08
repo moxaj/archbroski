@@ -47,6 +47,7 @@ dependencies = [
  "dirs 4.0.0",
  "itertools",
  "log",
+ "log-panics",
  "log4rs",
  "once_cell",
  "opencv",
@@ -1788,6 +1789,15 @@ name = "log-mdc"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a94d21414c1f4a51209ad204c1776a3d0765002c76c6abcb602a6f09f1e881c7"
+
+[[package]]
+name = "log-panics"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae0136257df209261daa18d6c16394757c63e032e27aafd8b07788b051082bef"
+dependencies = [
+ "log",
+]
 
 [[package]]
 name = "log4rs"
