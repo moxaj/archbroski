@@ -254,7 +254,7 @@ fn activate(app: &tauri::AppHandle) {
         drop(activation_state);
 
         let app = app.clone();
-        std::thread::spawn(move || {
+        tauri::async_runtime::spawn(async move {
             match Display::primary()
                 .map_err(|err| {
                     error!("failed to get primary display: {:?}", err);
