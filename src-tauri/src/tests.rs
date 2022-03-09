@@ -111,3 +111,26 @@ fn recipe_with_fillers() {
     assert!(combo.iter().collect::<HashSet<_>>().contains(&5));
     assert!(combo.iter().collect::<HashSet<_>>().contains(&20));
 }
+
+#[test]
+fn does_not_mess_up_recipe() {
+    let combo = get_suggested_combo(
+        collection![vec![38, 60, 57, 46], vec![37, 38, 31, 4]],
+        collection![54, 55, 56, 59, 61, 62],
+        collection![19 => 1, 34 => 1, 20 => 1, 9 => 1, 7 => 1],
+        collection![],
+    );
+    assert!(combo.is_some());
+    let combo = combo.unwrap();
+    assert_eq!(combo, vec![19, 34, 20, 9]);
+
+    let combo = get_suggested_combo(
+        collection![vec![38, 60, 57, 46], vec![37, 38, 31, 4]],
+        collection![54, 55, 56, 59, 61, 62],
+        collection![19 => 1, 34 => 1, 20 => 1, 9 => 1, 7 => 1],
+        collection![19, 34, 20],
+    );
+    assert!(combo.is_some());
+    let combo = combo.unwrap();
+    assert_eq!(combo, vec![19, 34, 20, 9]);
+}
