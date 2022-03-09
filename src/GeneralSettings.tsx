@@ -22,10 +22,6 @@ const GeneralSettings = ({ userSettings, setUserSettings }: GeneralSettingsProps
                         hotkey += 'ctrl + ';
                     }
 
-                    if (event.altKey) {
-                        hotkey += 'alt + ';
-                    }
-
                     if (event.shiftKey) {
                         hotkey += 'shift + '
                     }

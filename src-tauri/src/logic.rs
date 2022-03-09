@@ -221,7 +221,7 @@ impl DiscSynchronized for UserSettings {
             ],
             combo_roster: vec![0, 1],
             forbidden_modifier_ids: collection![54, 55, 56, 59, 61, 62],
-            hotkey: "alt + 1".to_owned(),
+            hotkey: "ctr + f".to_owned(),
             show_tiers: false,
         }
     }
