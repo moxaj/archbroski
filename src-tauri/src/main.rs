@@ -50,6 +50,7 @@ pub struct Cache {
     pub layout: Option<HashMap<u8, Vec2>>,
     pub images: DashMap<u64, Option<ModifierId>>,
     pub suggested_combos: HashMap<u64, Option<Vec<ModifierId>>>,
+    pub last_suggested_combo: Option<Vec<ModifierId>>,
 }
 
 impl Cache {
@@ -70,6 +71,7 @@ impl DiscSynchronized for Cache {
             layout: None,
             images: DashMap::new(),
             suggested_combos: HashMap::new(),
+            last_suggested_combo: None,
         }
     }
 

@@ -685,15 +685,35 @@ pub fn suggest_combo_cached(
     stash: &BTreeMap<ModifierId, usize>,
     queue: &[ModifierId],
 ) -> Option<Vec<ModifierId>> {
-    let mut hasher = DefaultHasher::new();
-    (user_settings, stash, queue).hash(&mut hasher);
-    let cache_key = hasher.finish();
-    cache
-        .suggested_combos
-        .entry(cache_key)
-        .or_insert_with(|| {
-            cache.modified = true;
-            suggest_combo(user_settings, stash, queue)
-        })
-        .clone()
+    match cache.last_suggested_combo {
+        Some(ref last_suggested_combo)
+            if last_suggested_combo
+                .iter()
+                .enumerate()
+                .all(|(index, &modifier_id)| {
+                    queue.get(index).is_none() && owns_modifier(stash, modifier_id)
+                        || queue.get(index) == Some(&modifier_id)
+                }) =>
+        {
+            Some(last_suggested_combo.clone())
+        }
+        _ => {
+            let mut hasher = DefaultHasher::new();
+            (user_settings, stash, queue).hash(&mut hasher);
+            let cache_key = hasher.finish();
+            cache
+                .suggested_combos
+                .entry(cache_key)
+                .or_insert_with(|| {
+                    cache.modified = true;
+                    suggest_combo(user_settings, stash, queue)
+                })
+                .as_ref()
+                .map(|combo| {
+                    cache.last_suggested_combo = Some(combo.clone());
+                    combo
+                })
+                .cloned()
+        }
+    }
 }
