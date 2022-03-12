@@ -66,10 +66,21 @@ pub trait DiscSynchronized: Sized + Serialize + DeserializeOwned {
         Ok(value)
     }
 
+    fn is_valid(&self) -> bool {
+        true
+    }
+
     fn load() -> Result<Self, Box<dyn Error>> {
         File::open(Self::output_path()?)
             .map_err(Into::into)
             .and_then(|file| Self::load_impl(BufReader::new(file)))
+            .and_then(|value| {
+                if value.is_valid() {
+                    Ok(value)
+                } else {
+                    Err("invalid value".into())
+                }
+            })
     }
 
     fn load_or_new_saved() -> Result<Self, Box<dyn Error>> {

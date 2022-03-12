@@ -40,10 +40,12 @@ use windows::Win32::{
     Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_TRANSITIONS_FORCEDISABLED},
 };
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 const IGNORE_CACHE: bool = false;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Cache {
+    pub version: String,
     pub modified: bool,
     pub layout: Option<HashMap<u8, Vec2>>,
     pub images: DashMap<u64, Option<ModifierId>>,
@@ -61,6 +63,7 @@ impl Cache {
 impl DiscSynchronized for Cache {
     fn create_new() -> Self {
         Self {
+            version: VERSION.into(),
             modified: false,
             layout: None,
             images: DashMap::new(),
@@ -74,6 +77,10 @@ impl DiscSynchronized for Cache {
 
     fn save_impl(&self, writer: &mut BufWriter<File>) -> Result<(), Box<dyn Error>> {
         <Self as BincodeDiscSynchronized>::save_impl(self, writer)
+    }
+
+    fn is_valid(&self) -> bool {
+        self.version == VERSION
     }
 
     fn load_impl(reader: BufReader<File>) -> Result<Self, Box<dyn Error>> {
