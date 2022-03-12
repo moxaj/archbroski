@@ -413,6 +413,7 @@ fn suggest_custom_combo(
     let filler_modifiers_ids = user_settings.get_filler_modifier_ids();
     let mut usable_filler_modifier_ids = filler_modifiers_ids
         .iter()
+        .filter(|&&modifier_id| owns_modifier(stash, modifier_id))
         .sorted_by(|&&modifier_id1, &&modifier_id2| {
             Ord::cmp(
                 &owned_modifier_count(stash, modifier_id1),
@@ -420,7 +421,6 @@ fn suggest_custom_combo(
             )
             .reverse()
         })
-        .filter(|&&modifier_id| owns_modifier(stash, modifier_id))
         .map(|&modifier_id| (None, collection![modifier_id]))
         .collect::<Vec<(Option<u8>, BTreeSet<_>)>>();
     if usable_filler_modifier_ids.len() < 2 {
@@ -534,12 +534,13 @@ fn suggest_custom_combo(
         .dedup()
         .chain(usable_filler_modifier_ids)
         .collect_vec();
+    println!("queue: {:?}", queue);
+    println!("usable modifier ids: {:?}", usable_modifier_ids);
     let mut indices = vec![-1i32];
-    let mut suggested_combo_and_value: Option<(Vec<ModifierId>, f32)> = None;
+    let mut suggested_combo: Option<(Vec<ModifierId>, (usize, f32))> = None;
     let time_before = Instant::now();
     loop {
-        if time_before.elapsed().as_millis() > TIME_BUDGET_MS && suggested_combo_and_value.is_some()
-        {
+        if time_before.elapsed().as_millis() > TIME_BUDGET_MS && suggested_combo.is_some() {
             break;
         }
 
@@ -584,12 +585,12 @@ fn suggest_custom_combo(
                     }
 
                     get_unordered_combo_value(queue, &combo, &produced_modifier_ids)
-                        .map(|(combo, value)| (index, combo, value))
+                        .map(|(combo, value)| (index, combo, 1.0 / value))
                 })
             {
                 if combo.len() == QUEUE_LENGTH {
                     let produced_modifier_ids = get_produced_modifier_ids(&combo);
-                    let filler_count = 4 - produced_modifier_ids
+                    let combo_effective_filler_count = 4 - produced_modifier_ids
                         .keys()
                         .map(|recipe| recipe.len())
                         .sum::<usize>()
@@ -603,19 +604,48 @@ fn suggest_custom_combo(
                                 }
                             })
                             .sum::<usize>();
-
-                    if filler_count == 0 {
-                        suggested_combo_and_value = Some((combo, value));
+                    let combo_filler_count = combo
+                        .iter()
+                        .filter(|&&modifier_id| filler_modifiers_ids.contains(&modifier_id))
+                        .count();
+                    let stash_filler_count = stash
+                        .iter()
+                        .map(|(&modifier_id, &modifier_count)| {
+                            if filler_modifiers_ids.contains(&modifier_id) {
+                                modifier_count
+                            } else {
+                                0usize
+                            }
+                        })
+                        .sum::<usize>();
+                    let stash_count = stash
+                        .iter()
+                        .map(|(_, &modifier_count)| modifier_count)
+                        .sum::<usize>();
+                    println!(
+                        "other stuff: {:?}",
+                        (
+                            &combo,
+                            &produced_modifier_ids,
+                            &combo_effective_filler_count,
+                            &combo_filler_count,
+                            &stash_filler_count,
+                            &stash_count
+                        )
+                    );
+                    if combo_effective_filler_count == 0 {
+                        suggested_combo = Some((combo, (combo_effective_filler_count, value)));
                         break;
                     }
 
-                    if filler_count <= 2
-                        && suggested_combo_and_value
+                    if (combo_effective_filler_count <= 2
+                        || (combo_filler_count == 4 && stash_filler_count > 12 && stash_count > 60))
+                        && suggested_combo
                             .as_ref()
-                            .filter(|&(_, value_)| *value_ > value)
+                            .filter(|&(_, score)| *score < (combo_effective_filler_count, value))
                             .is_none()
                     {
-                        suggested_combo_and_value = Some((combo, value));
+                        suggested_combo = Some((combo, (combo_effective_filler_count, value)));
                     }
                 }
 
@@ -627,8 +657,7 @@ fn suggest_custom_combo(
         }
     }
 
-    // TODO if inventory is full and there aren't enough fillers, use a non filler we have an abundance of
-    suggested_combo_and_value.map(|(combo, _)| {
+    suggested_combo.map(|(combo, _)| {
         info!("suggested custom combo: {:?}", combo);
         combo
     })

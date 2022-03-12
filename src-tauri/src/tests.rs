@@ -134,3 +134,22 @@ fn does_not_mess_up_recipe() {
     let combo = combo.unwrap();
     assert_eq!(combo, vec![19, 34, 20, 9]);
 }
+
+#[test]
+fn stash_full_four_filler() {
+    let combo = get_suggested_combo(
+        collection![],
+        collection![],
+        collection![0 => 15, 1 => 15, 2 => 15, 3 => 15],
+        collection![],
+    );
+    assert!(combo.is_none());
+
+    let combo = get_suggested_combo(
+        collection![],
+        collection![],
+        collection![0 => 15, 1 => 15, 2 => 15, 3 => 16],
+        collection![],
+    );
+    assert!(combo.is_some());
+}
