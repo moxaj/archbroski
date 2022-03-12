@@ -213,6 +213,8 @@ impl UserSettings {
 }
 
 impl DiscSynchronized for UserSettings {
+    const FILE_NAME: &'static str = "archbroski\\settings.json";
+
     fn create_new() -> Self {
         Self {
             combo_catalog: vec![
@@ -224,10 +226,6 @@ impl DiscSynchronized for UserSettings {
             hotkey: "ctr + f".to_owned(),
             show_tiers: false,
         }
-    }
-
-    fn file_name() -> &'static str {
-        "archbroski\\settings.json"
     }
 
     fn save_impl(&self, writer: &mut std::io::BufWriter<File>) -> Result<(), Box<dyn Error>> {

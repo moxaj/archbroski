@@ -61,6 +61,8 @@ impl Cache {
 }
 
 impl DiscSynchronized for Cache {
+    const FILE_NAME: &'static str = "archbroski\\.cache";
+
     fn create_new() -> Self {
         Self {
             version: VERSION.into(),
@@ -69,10 +71,6 @@ impl DiscSynchronized for Cache {
             images: DashMap::new(),
             suggested_combos: HashMap::new(),
         }
-    }
-
-    fn file_name() -> &'static str {
-        "archbroski\\.cache"
     }
 
     fn save_impl(&self, writer: &mut BufWriter<File>) -> Result<(), Box<dyn Error>> {

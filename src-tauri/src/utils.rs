@@ -33,9 +33,9 @@ macro_rules! info_timed {
 }
 
 pub trait DiscSynchronized: Sized + Serialize + DeserializeOwned {
-    fn create_new() -> Self;
+    const FILE_NAME: &'static str;
 
-    fn file_name() -> &'static str;
+    fn create_new() -> Self;
 
     fn save_impl(&self, writer: &mut BufWriter<File>) -> Result<(), Box<dyn Error>>;
 
@@ -45,7 +45,7 @@ pub trait DiscSynchronized: Sized + Serialize + DeserializeOwned {
         config_dir()
             .ok_or_else(|| "Cannot find home directory.".into())
             .map(|mut path| {
-                path.push(PathBuf::from(Self::file_name()));
+                path.push(PathBuf::from(Self::FILE_NAME));
                 path
             })
     }
