@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.1.0"
+version = "0.2.0"
 description = "Archbroski"
 authors = ["Viktor Magyari"]
 license = ""
@@ -10,7 +10,7 @@ edition = "2021"
 rust-version = "1.57"
 
 [build-dependencies]
-tauri-build = { version = "1.0.0-rc.3", features = [] }
+tauri-build = { version = "1.0.0-rc.4", features = [] }
 
 [dependencies]
 itertools = "0.10.3"
@@ -29,10 +29,10 @@ scrap = "0.5"
 opencv = { version = "0.63", features = ["clang-runtime"] }
 serde = { version = "1.0", features = ["derive"] }
 tao = "0.6.2"
-tauri = { version = "1.0.0-rc.3", features = ["api-all", "system-tray"] }
+tauri = { version = "1.0.0-rc.4", features = ["api-all", "system-tray"] }
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
-version = "0.32.0"
+version = "0.33.0"
 features = [
   "alloc",
   "Win32_Foundation",

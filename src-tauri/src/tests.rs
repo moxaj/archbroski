@@ -140,7 +140,7 @@ fn stash_full_four_filler() {
     let combo = get_suggested_combo(
         collection![],
         collection![],
-        collection![0 => 15, 1 => 15, 2 => 15, 3 => 15],
+        collection![0 => 15, 1 => 15, 2 => 15, 3 => 14],
         collection![],
     );
     assert!(combo.is_none());
@@ -148,7 +148,7 @@ fn stash_full_four_filler() {
     let combo = get_suggested_combo(
         collection![],
         collection![],
-        collection![0 => 15, 1 => 15, 2 => 15, 3 => 16],
+        collection![0 => 15, 1 => 15, 2 => 15, 3 => 15],
         collection![],
     );
     assert!(combo.is_some());
