@@ -1,14 +1,10 @@
 import React from 'react';
 import { Box, Button, Typography } from '@mui/material';
-import { UserSettings } from './Settings';
+import { UserSettingsContext } from './Settings';
 import WithLoading from './WithLoading';
 
-type GeneralSettingsProps = {
-    userSettings: UserSettings;
-    setUserSettings: React.Dispatch<React.SetStateAction<UserSettings | undefined>>;
-}
-
-const GeneralSettings = ({ userSettings, setUserSettings }: GeneralSettingsProps) => {
+const GeneralSettings = () => {
+    const [userSettings, setUserSettings] = React.useContext(UserSettingsContext)!;
     const [recordingHotkey, setRecordingHotkey] = React.useState(false);
     React.useEffect(() => {
         const keydownListener = (event: KeyboardEvent) => {
@@ -38,7 +34,7 @@ const GeneralSettings = ({ userSettings, setUserSettings }: GeneralSettingsProps
 
                     setRecordingHotkey(false);
                     setUserSettings(userSettings => ({
-                        ...userSettings!,
+                        ...userSettings,
                         hotkey
                     }));
                 }
@@ -50,7 +46,7 @@ const GeneralSettings = ({ userSettings, setUserSettings }: GeneralSettingsProps
         };
     }, [recordingHotkey, setUserSettings]);
     return (
-        <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
+        <WithLoading sx={{ width: 1, height: 1 }} loadSuccessful={(
             <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ display: 'flex' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column' }}>
@@ -63,7 +59,7 @@ const GeneralSettings = ({ userSettings, setUserSettings }: GeneralSettingsProps
                     </Box>
                 </Box>
             </Box>
-        </WithLoading>
+        )} />
     )
 };
 

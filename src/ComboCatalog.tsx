@@ -2,7 +2,7 @@ import React from 'react';
 import { Delete, Add, Error } from '@mui/icons-material';
 import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, TextField, Select, MenuItem, Typography, Box, IconButton, Tooltip, Zoom, Fade } from '@mui/material';
 import { numberKeys } from '.';
-import { LabeledCombo, UserSettings, Modifiers } from './Settings';
+import { LabeledCombo, ModifiersContext, UserSettingsContext } from './Settings';
 import WithLoading from './WithLoading';
 import { DialogTransition } from './ComboSettings';
 
@@ -43,12 +43,9 @@ const DeleteComboDialog = ({ combo, open, onClose }: DeleteComboDialogProps) => 
     );
 };
 
-type ComboCatalogProps = {
-    userSettings: UserSettings;
-    setUserSettings: React.Dispatch<React.SetStateAction<UserSettings | undefined>>;
-    modifiers: Modifiers;
-};
-const ComboCatalog = ({ userSettings, setUserSettings, modifiers }: ComboCatalogProps) => {
+const ComboCatalog = () => {
+    const [modifiers] = React.useContext(ModifiersContext)!;
+    const [userSettings, setUserSettings] = React.useContext(UserSettingsContext)!;
     const [deleteComboDialogOpen, setDeleteComboDialogOpen] = React.useState(false);
     const [comboToDelete, setComboToDelete] = React.useState<LabeledCombo | undefined>(undefined);
     const sortedModifierIds = React.useMemo(() => {
@@ -64,11 +61,11 @@ const ComboCatalog = ({ userSettings, setUserSettings, modifiers }: ComboCatalog
     const addCombo = () => {
         setUserSettings(userSettings => {
             return {
-                ...userSettings!,
+                ...userSettings,
                 comboCatalog: [
-                    ...userSettings!.comboCatalog,
+                    ...userSettings.comboCatalog,
                     {
-                        id: 1 + Math.max(0, ...userSettings!.comboCatalog.map(({ id }) => id)),
+                        id: 1 + Math.max(0, ...userSettings.comboCatalog.map(({ id }) => id)),
                         label: '',
                         combo: [4, 5, 7, 2],
                     }
@@ -79,17 +76,17 @@ const ComboCatalog = ({ userSettings, setUserSettings, modifiers }: ComboCatalog
     const deleteCombo = (comboId: number) => {
         setUserSettings(userSettings => {
             return {
-                ...userSettings!,
-                comboCatalog: userSettings!.comboCatalog.filter(({ id }) => id !== comboId),
-                comboRoster: userSettings!.comboRoster.filter(id => id !== comboId),
+                ...userSettings,
+                comboCatalog: userSettings.comboCatalog.filter(({ id }) => id !== comboId),
+                comboRoster: userSettings.comboRoster.filter(id => id !== comboId),
             };
         });
     };
     const setComboLabel = (comboId: number, label: string) => {
         setUserSettings(userSettings => {
             return {
-                ...userSettings!,
-                comboCatalog: userSettings!.comboCatalog.map(({ id, label: label_, combo }) => ({
+                ...userSettings,
+                comboCatalog: userSettings.comboCatalog.map(({ id, label: label_, combo }) => ({
                     id,
                     label: id !== comboId ? label_ : label,
                     combo
@@ -100,8 +97,8 @@ const ComboCatalog = ({ userSettings, setUserSettings, modifiers }: ComboCatalog
     const setModifierId = (comboId: number, modifierIdIndex: number, modifierId: number) => {
         setUserSettings(userSettings => {
             return {
-                ...userSettings!,
-                comboCatalog: userSettings!.comboCatalog.map(({ id, label, combo }) => ({
+                ...userSettings,
+                comboCatalog: userSettings.comboCatalog.map(({ id, label, combo }) => ({
                     id,
                     label,
                     combo: id !== comboId ? combo : combo.map((modifierId_, modifierIdIndex_) =>
@@ -121,7 +118,7 @@ const ComboCatalog = ({ userSettings, setUserSettings, modifiers }: ComboCatalog
         }
     };
     return (
-        <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
+        <WithLoading sx={{ width: 1, height: 1 }} loadSuccessful={(
             <Box sx={{ width: 1, height: 1 }}>
                 <DeleteComboDialog combo={comboToDelete} open={deleteComboDialogOpen} onClose={confirmed => confirmDeleteCombo(comboToDelete?.id!, confirmed ?? false)} />
                 <TableContainer sx={{ width: 1, height: 550, overflow: 'overlay' }}>
@@ -198,7 +195,7 @@ const ComboCatalog = ({ userSettings, setUserSettings, modifiers }: ComboCatalog
                     </IconButton>
                 </Fade>
             </Box>
-        </WithLoading>
+        )} />
     );
 };
 

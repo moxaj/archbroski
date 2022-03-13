@@ -2,16 +2,10 @@ import React from 'react';
 import { TransitionGroup } from 'react-transition-group';
 import { Lock, Star, SyncAlt } from '@mui/icons-material';
 import { Box, Typography, Chip, Divider, Zoom, FormControlLabel, Switch, Fade } from '@mui/material';
-import { UserSettings, Modifiers, LabeledCombo } from './Settings';
+import { Modifiers, LabeledCombo, UserSettingsContext, ModifiersContext } from './Settings';
 import WithLoading from './WithLoading';
 import { numberKeys } from '.';
 import { DragDropContext, Droppable, Draggable, DropResult, DragStart } from 'react-beautiful-dnd';
-
-type ComboRosterProps = {
-    userSettings: UserSettings;
-    setUserSettings: React.Dispatch<React.SetStateAction<UserSettings | undefined>>;
-    modifiers: Modifiers;
-};
 
 const comboLabel = ({ label, id }: LabeledCombo) => {
     return label !== ''
@@ -21,12 +15,15 @@ const comboLabel = ({ label, id }: LabeledCombo) => {
 const getUsedModifierIds = (modifiers: Modifiers, modifierId: number): number[] =>
     [modifierId, ...modifiers.byId[modifierId].recipe.flatMap(modifierId_ => getUsedModifierIds(modifiers, modifierId_))];
 
-const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterProps) => {
+const ComboRoster = () => {
+    const [modifiers] = React.useContext(ModifiersContext)!;
+    const [userSettings, setUserSettings] = React.useContext(UserSettingsContext)!;
+
     const toggleForbiddenModifierId = (modifierId: number) => {
         setUserSettings(userSettings => {
-            const forbiddenModifierIds = userSettings!.forbiddenModifierIds;
+            const forbiddenModifierIds = userSettings.forbiddenModifierIds;
             return {
-                ...userSettings!,
+                ...userSettings,
                 forbiddenModifierIds: forbiddenModifierIds.includes(modifierId)
                     ? forbiddenModifierIds.filter(modifierId_ => modifierId_ !== modifierId)
                     : [...forbiddenModifierIds, modifierId]
@@ -74,10 +71,10 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
             });
         } else {
             setUserSettings(userSettings => {
-                const newUsedComboIds = [...userSettings!.comboRoster];
+                const newUsedComboIds = [...userSettings.comboRoster];
                 newUsedComboIds.splice(source.index, 1);
                 return {
-                    ...userSettings!,
+                    ...userSettings,
                     comboRoster: newUsedComboIds,
                 };
             });
@@ -91,10 +88,10 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
             });
         } else {
             setUserSettings(userSettings => {
-                const newUsedComboIds = [...userSettings!.comboRoster];
+                const newUsedComboIds = [...userSettings.comboRoster];
                 newUsedComboIds.splice(destination.index, 0, draggedComboId);
                 return {
-                    ...userSettings!,
+                    ...userSettings,
                     comboRoster: newUsedComboIds,
                 };
             });
@@ -110,13 +107,13 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
     const setShowTiers = (showTiers: boolean) => {
         setUserSettings(userSettings => (
             {
-                ...userSettings!,
+                ...userSettings,
                 showTiers
             }
         ));
     };
     return (
-        <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
+        <WithLoading sx={{ width: 1, height: 1 }} loadSuccessful={(
             <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ position: 'relative', width: 1, height: 300, display: 'flex' }}>
                     <SyncAlt color='primary' sx={{
@@ -199,7 +196,7 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                                                 transition: (theme) => theme.transitions.create(['opacity', 'transform']),
                                                 opacity: unusedModifierIdOpacity(draggedComboId, modifierId, modifierIdsUsedByDragged)
                                             }}>
-                                                <Zoom in={userSettings!.forbiddenModifierIds.includes(modifierId)}>
+                                                <Zoom in={userSettings.forbiddenModifierIds.includes(modifierId)}>
                                                     <Lock sx={{
                                                         position: 'absolute', right: 0, top: 0, fontSize: '14px',
                                                         transform: 'translateX(20%)',
@@ -236,7 +233,7 @@ const ComboRoster = ({ userSettings, setUserSettings, modifiers }: ComboRosterPr
                         label="Show tiers" />
                 </Box>
             </Box >
-        </WithLoading >
+        )} />
     );
 };
 

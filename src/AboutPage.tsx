@@ -4,7 +4,7 @@ import WithLoading from './WithLoading';
 
 const AboutPage = () => {
     return (
-        <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
+        <WithLoading sx={{ width: 1, height: 1 }} loadSuccessful={(
             <Box sx={{ width: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
                 <Typography variant='h6'>
                     Source code, bug reports and feature requests, discussion
@@ -25,7 +25,7 @@ const AboutPage = () => {
                     &nbsp;<Link target={'_blank'} href='https://github.com/moxaj/archbroski/blob/main/src-tauri/Cargo.toml'>files</Link>
                 </Typography>
             </Box>
-        </WithLoading>
+        )} />
     )
 };
 

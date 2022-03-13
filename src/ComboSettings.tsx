@@ -4,7 +4,6 @@ import { TransitionProps } from '@mui/material/transitions';
 import { Box, Dialog, DialogContent, DialogContentText, DialogTitle, IconButton, Tab, Tabs, Zoom } from '@mui/material';
 import { TabContext, TabPanel } from '@mui/lab';
 import WithLoading from './WithLoading';
-import { UserSettings, Modifiers } from './Settings';
 import ComboCatalog from './ComboCatalog';
 import ComboRoster from './ComboRoster';
 
@@ -47,16 +46,11 @@ const HelpDialog = ({ open, onClose }: HelpDialogProps) => {
     );
 };
 
-type ComboSettingsProps = {
-    userSettings: UserSettings;
-    setUserSettings: React.Dispatch<React.SetStateAction<UserSettings | undefined>>;
-    modifiers: Modifiers;
-};
-const ComboSettings = ({ userSettings, setUserSettings, modifiers }: ComboSettingsProps) => {
+const ComboSettings = () => {
     const [tab, setTab] = React.useState('catalog');
     const [helpDialogOpen, setHelpDialogOpen] = React.useState(false);
     return (
-        <WithLoading loaded={true} sx={{ width: 1, height: 1 }}>
+        <WithLoading sx={{ width: 1, height: 1 }} loadSuccessful={(
             <Box sx={{ width: 1, height: 1 }}>
                 <HelpDialog open={helpDialogOpen} onClose={() => { setHelpDialogOpen(false) }} />
                 <TabContext value={tab}>
@@ -73,15 +67,15 @@ const ComboSettings = ({ userSettings, setUserSettings, modifiers }: ComboSettin
                             <Tab label='Roster' value={'roster'} />
                         </Tabs>
                         <TabPanel value={'catalog'} sx={{ flexGrow: 1, pt: 0 }}>
-                            <ComboCatalog userSettings={userSettings} setUserSettings={setUserSettings} modifiers={modifiers} />
+                            <ComboCatalog />
                         </TabPanel>
                         <TabPanel value={'roster'} sx={{ flexGrow: 1, pt: 0 }}>
-                            <ComboRoster userSettings={userSettings} setUserSettings={setUserSettings} modifiers={modifiers} />
+                            <ComboRoster />
                         </TabPanel>
                     </Box>
                 </TabContext>
             </Box>
-        </WithLoading>
+        )} />
     );
 };
 

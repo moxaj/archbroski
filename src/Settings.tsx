@@ -19,6 +19,11 @@ export type Modifiers = {
     components: { [key: number]: { [key: number]: number } }
 };
 
+const defaultModifiers: Modifiers = {
+    byId: {},
+    components: {}
+};
+
 export type LabeledCombo = {
     id: number,
     label: string,
@@ -33,19 +38,28 @@ export type UserSettings = {
     showTiers: boolean;
 };
 
+const defaultUserSettings: UserSettings = {
+    comboCatalog: [],
+    comboRoster: [],
+    forbiddenModifierIds: [],
+    hotkey: '',
+    showTiers: false,
+};
+
+export const ModifiersContext = React.createContext<[Modifiers] | undefined>(undefined);
+export const UserSettingsContext = React.createContext<[UserSettings, React.Dispatch<React.SetStateAction<UserSettings>>] | undefined>(undefined);
 const Settings = () => {
-    const [userSettings, setUserSettings] = React.useState<UserSettings | undefined>(undefined);
-    const [modifiers, setModifiers] = React.useState<Modifiers | undefined>(undefined);
+    const [load, setLoad] = React.useState<Promise<any> | undefined>(undefined);
+    const [modifiers, setModifiers] = React.useState<Modifiers>(defaultModifiers);
+    const [userSettings, setUserSettings] = React.useState<UserSettings>(defaultUserSettings);
     const [tab, setTab] = React.useState('general');
     React.useEffect(() => {
-        Promise
-            .all([
-                invoke<UserSettings>('get_user_settings'),
-                invoke<Modifiers>('get_modifiers')
-            ])
-            .then(([userSettings, modifiers]) => {
-                setUserSettings(userSettings);
+        const load = Promise.all([invoke<Modifiers>('get_modifiers'), invoke<UserSettings>('get_user_settings')]);
+        setLoad(load);
+        load
+            .then(([modifiers, userSettings]: [Modifiers, UserSettings]) => {
                 setModifiers(modifiers);
+                setUserSettings(userSettings);
                 window.getCurrent().show();
             })
             .catch(console.error);
@@ -54,6 +68,8 @@ const Settings = () => {
         if (userSettings === undefined) {
             return;
         }
+
+        console.log('user settings changed!');
 
         const timeoutId = setTimeout(() => {
             invoke('set_user_settings', {
@@ -80,32 +96,46 @@ const Settings = () => {
             </AppBar>
             <Toolbar />
             <TabContext value={tab}>
-                <WithLoading loaded={modifiers !== undefined} sx={{ width: 1, height: 1 }}>
-                    <Box sx={{ width: 1, height: 1, display: 'flex' }}>
-                        <Box sx={{ width: 150, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
-                            <Tabs
-                                orientation='vertical'
-                                value={tab}
-                                onChange={(_, value) => { setTab(value) }}
-                                sx={{ height: 1, borderRight: 1, borderColor: 'divider' }}>
-                                <Tab label='General' value={'general'} />
-                                <Tab label='Combos' value={'combos'} />
-                                <Tab label='About' value={'about'} />
-                            </Tabs>
+                <WithLoading
+                    sx={{ width: 1, height: 1 }}
+                    promise={load}
+                    loadSuccessful={(
+                        <Box sx={{ width: 1, height: 1 }}>
+                            <ModifiersContext.Provider value={[modifiers]}>
+                                <UserSettingsContext.Provider value={[userSettings, setUserSettings]}>
+                                    <Box sx={{ width: 1, height: 1, display: 'flex' }}>
+                                        <Box sx={{ width: 150, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+                                            <Tabs
+                                                orientation='vertical'
+                                                value={tab}
+                                                onChange={(_, value) => { setTab(value) }}
+                                                sx={{ height: 1, borderRight: 1, borderColor: 'divider' }}>
+                                                <Tab label='General' value={'general'} />
+                                                <Tab label='Combos' value={'combos'} />
+                                                <Tab label='About' value={'about'} />
+                                            </Tabs>
+                                        </Box>
+                                        <Box sx={{ flexGrow: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
+                                            <TabPanel value={'general'} sx={{ width: 1, height: 1 }}>
+                                                <GeneralSettings />
+                                            </TabPanel>
+                                            <TabPanel value={'combos'} sx={{ width: 1, height: 1, p: 0 }}>
+                                                <ComboSettings />
+                                            </TabPanel>
+                                            <TabPanel value={'about'} sx={{ width: 1, height: 1 }}>
+                                                <AboutPage />
+                                            </TabPanel>
+                                        </Box>
+                                    </Box>
+                                </UserSettingsContext.Provider>
+                            </ModifiersContext.Provider>
                         </Box>
-                        <Box sx={{ flexGrow: 1, height: 1, display: 'flex', flexDirection: 'column' }}>
-                            <TabPanel value={'general'} sx={{ width: 1, height: 1 }}>
-                                <GeneralSettings userSettings={userSettings!} setUserSettings={setUserSettings} />
-                            </TabPanel>
-                            <TabPanel value={'combos'} sx={{ width: 1, height: 1, p: 0 }}>
-                                <ComboSettings userSettings={userSettings!} setUserSettings={setUserSettings} modifiers={modifiers!} />
-                            </TabPanel>
-                            <TabPanel value={'about'} sx={{ width: 1, height: 1 }}>
-                                <AboutPage />
-                            </TabPanel>
+                    )}
+                    loadFailed={(
+                        <Box sx={{ width: 1, height: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                            sadge
                         </Box>
-                    </Box>
-                </WithLoading>
+                    )} />
             </TabContext>
         </Box>
     );
